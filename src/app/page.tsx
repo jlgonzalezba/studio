@@ -7,7 +7,7 @@ import { LayoutTemplate, Sprout, Target, View } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-screen bg-transparent">
+    <div className="flex flex-col min-h-screen bg-white">
       <Header />
       <main className="flex-1">
         <section className="container mx-auto px-4 pt-20 pb-16 md:pt-32 md:pb-24 text-center flex flex-col items-center">
@@ -26,21 +26,25 @@ export default function Home() {
               icon={Sprout}
               title="Universal Converter"
               description="Placeholder for the first application. Here you can describe its main functionality and the value it provides."
+              color="green"
             />
             <AppCard
               icon={LayoutTemplate}
               title="PLT Interpretation On The Fly"
               description="Placeholder for the second application. Explore how this tool will optimize your workflows."
+              color="blue"
             />
             <AppCard
               icon={Target}
               title="Fast CBL Look"
               description="Placeholder for the third application. Focused on achieving your goals with precision and efficiency."
+              color="red"
             />
             <AppCard
               icon={View}
               title="Sigma to Pseudo-Resistivity Converter"
               description="Placeholder for the fourth application. Visualize your data and results in a completely new way."
+              color="yellow"
             />
           </div>
         </section>
