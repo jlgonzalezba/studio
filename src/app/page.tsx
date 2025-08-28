@@ -38,7 +38,7 @@ export default function Home() {
             />
             <AppCard
               icon={Target}
-              title="Fast CBL Look"
+              title="CBL Fast Look"
               description="Placeholder for the third application. Focused on achieving your goals with precision and efficiency."
               color="red"
             />
