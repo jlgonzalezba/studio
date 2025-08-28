@@ -7,8 +7,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 export function Header() {
   const navLinks = [
-    { href: "#", label: "Noticias" },
-    { href: "#", label: "Contactenos" },
+    { href: "#", label: "News" },
+    { href: "#", label: "Contact Us" },
   ];
 
   return (
@@ -22,7 +22,7 @@ export function Header() {
             </Link>
           ))}
           <Button asChild>
-            <Link href="#">Login</Link>
+            <Link href="/login">Login</Link>
           </Button>
         </nav>
         <div className="md:hidden">
@@ -30,7 +30,7 @@ export function Header() {
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
                 <Menu className="h-6 w-6" />
-                <span className="sr-only">Abrir menú</span>
+                <span className="sr-only">Open menu</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right">
@@ -43,7 +43,7 @@ export function Header() {
                     </Link>
                   ))}
                   <Button asChild className="w-full">
-                    <Link href="#">Login</Link>
+                    <Link href="/login">Login</Link>
                   </Button>
                 </nav>
               </div>

@@ -3,7 +3,7 @@ import Image from 'next/image';
 
 export function Logo() {
   return (
-    <a href="/" className="flex items-center" aria-label="Página de inicio de EnerTech3">
+    <a href="/" className="flex items-center" aria-label="EnerTech3 homepage">
       <Image 
         src="/enertech-logo.png" 
         alt="EnerTech3 logo" 
