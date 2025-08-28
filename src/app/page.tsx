@@ -15,23 +15,21 @@ export default function Home() {
             Energy and Technology in Sync
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            A centralized space for your future tools. Designed to be clean, fast, and professional.
+            A centralized space for your Cased Hole Logs tools. Designed to be clean, fast, and professional.
           </p>
-          <Button asChild size="lg" className="rounded-full px-8 h-12 text-base shadow-[0_8px_20px_rgba(108,63,240,0.25)] hover:shadow-[0_12px_28px_rgba(108,63,240,0.3)] transition-shadow">
-            <Link href="/login">Get Started Now</Link>
-          </Button>
+         
         </section>
 
         <section className="container mx-auto px-4 pb-20 md:pb-32">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
             <AppCard
               icon={Sprout}
-              title="Units Conversor"
+              title="Universal Converter"
               description="Placeholder for the first application. Here you can describe its main functionality and the value it provides."
             />
             <AppCard
               icon={LayoutTemplate}
-              title="PLT Interpretation In The Run"
+              title="PLT Interpretation On The Fly"
               description="Placeholder for the second application. Explore how this tool will optimize your workflows."
             />
             <AppCard
@@ -41,7 +39,7 @@ export default function Home() {
             />
             <AppCard
               icon={View}
-              title="Sigma to PseudoResistivity Converter"
+              title="Sigma to Pseudo-Resistivity Converter"
               description="Placeholder for the fourth application. Visualize your data and results in a completely new way."
             />
           </div>

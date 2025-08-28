@@ -1,20 +1,16 @@
 import React from 'react';
+import Image from 'next/image';
 
 export function Logo() {
   return (
     <a href="/" className="flex items-center" aria-label="EnerTech3 homepage">
-      <svg 
-        width="100" 
-        height="100" 
-        viewBox="0 0 168 168" 
-        fill="none" 
-        xmlns="https://ibb.co/yn4nZqB8"
-        
-      >
-        <path d="M101.405 25.0488C101.405 25.0488 43.5117 2.07812 43.5117 52.8457C43.5117 90.3906 72.457 101.996 82.2617 104.766C82.2617 104.766 82.2617 140.713 82.2617 142.957C82.2617 142.957 42.0664 133.09 42.0664 104.766C42.0664 104.766 42.0664 88.5977 42.0664 80.3164C42.0664 68.7109 46.7773 48.0195 72.457 33.5801C85.3125 26.3867 101.405 25.0488 101.405 25.0488Z" fill="#F07E26"/>
-        <path d="M82.2539 104.766C82.2539 104.766 82.2539 140.713 82.2539 142.957C82.2539 142.957 122.449 133.09 122.449 104.766V80.3164C122.449 68.7109 117.738 48.0195 92.0586 33.5801C79.2031 26.3867 63.1113 25.0488 63.1113 25.0488C63.1113 25.0488 121.004 2.07812 121.004 52.8457C121.004 90.3906 92.0586 101.996 82.2539 104.766Z" fill="#0E2D4A"/>
-        <path d="M125.105 119.531L82.25 142.957L39.3945 119.531L82.25 96.1055L125.105 119.531Z" fill="#F07E26"/>
-      </svg>
+      <Image 
+        src="/logo.png" 
+        alt="EnerTech3 Logo" 
+        width={100} 
+        height={100}
+        className="mr-3"
+      />
       <span className="text-xl font-extrabold tracking-tight text-foreground whitespace-nowrap">
         EnerTech3
       </span>
