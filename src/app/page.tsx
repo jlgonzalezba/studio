@@ -22,15 +22,17 @@ export default function Home() {
 
         <section className="container mx-auto px-4 pb-20 md:pb-32">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-            <AppCard
-              icon={Sprout}
-              title="Universal Converter"
-              description="Placeholder for the first application. Here you can describe its main functionality and the value it provides."
-              color="green"
-            />
+            <Link href="/universal-converter">
+              <AppCard
+                icon={Sprout}
+                title="Universal Converter"
+                description="Placeholder for the first application. Here you can describe its main functionality and the value it provides."
+                color="green"
+              />
+            </Link>
             <AppCard
               icon={LayoutTemplate}
-              title="PLT Interpretation On The Fly"
+              title="PLT's Interpretation On The Fly"
               description="Placeholder for the second application. Explore how this tool will optimize your workflows."
               color="blue"
             />
