@@ -5,7 +5,7 @@ export function Logo() {
   return (
     <a href="/" className="flex items-center" aria-label="EnerTech3 homepage">
       <Image 
-        src="/logo.png" 
+        src="/logo.jpg" 
         alt="EnerTech3 Logo" 
         width={100} 
         height={100}
