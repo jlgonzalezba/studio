@@ -7,8 +7,8 @@ export function Logo() {
       <Image 
         src="/logo.jpg" 
         alt="EnerTech3 Logo" 
-        width={100} 
-        height={100}
+        width={200} 
+        height={200}
       />
     </a>
   );

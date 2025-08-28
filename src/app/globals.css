@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 228 100% 99%; /* #F6F8FF */
+    --background: 0 0% 100%;
     --foreground: 224 44% 10%; /* #0E1324 */
     --card: 0 0% 100%;
     --card-foreground: 224 44% 10%;
@@ -64,12 +64,6 @@
     @apply border-border;
   }
   body {
-    @apply text-foreground;
-    background-color: #F6FAFF; /* Fallback */
-    background-image: 
-      radial-gradient(#E9ECF5 1px, transparent 1px),
-      linear-gradient(135deg, #F6FAFF 0%, #EAF3FF 100%);
-    background-size: 1.25rem 1.25rem, auto;
-    background-position: 8px 8px, 0 0;
+    @apply bg-background text-foreground;
   }
 }
