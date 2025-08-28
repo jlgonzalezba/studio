@@ -68,8 +68,15 @@ export default {
       },
       borderRadius: {
         lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        md: 'calc(var(--radius) - 6px)',
+        sm: 'calc(var(--radius) - 12px)',
+      },
+      boxShadow: {
+        card: '0 8px 24px rgba(108, 63, 240, 0.08), 0 2px 8px rgba(14, 19, 36, 0.05)',
+        'card-hover': '0 16px 40px rgba(108, 63, 240, 0.12), 0 4px 12px rgba(14, 19, 36, 0.06)',
+      },
+      transitionTimingFunction: {
+        'emphasized': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
       },
       keyframes: {
         'accordion-down': {
