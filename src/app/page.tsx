@@ -10,11 +10,11 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-white">
       <Header />
       <main className="flex-1">
-        <section className="container mx-auto px-4 pt-20 pb-16 md:pt-32 md:pb-24 text-center flex flex-col items-center">
+        <section className="container mx-auto px-4 pt-8 pb-8 md:pt-12 md:pb-12 text-center flex flex-col items-center">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-6 max-w-3xl">
-            Energy and Technology in Sync
+            Try our best APPS to enhance your productivity
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
             A centralized space for your Cased Hole Logs tools. Designed to be clean, fast, and professional.
           </p>
          
