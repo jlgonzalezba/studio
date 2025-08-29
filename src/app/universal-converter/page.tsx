@@ -4,7 +4,7 @@ import { Sprout } from "lucide-react";
 
 export default function UniversalConverterPage() {
   // La URL donde está corriendo tu app de Streamlit (puerto por defecto 8501)
-  const streamlitUrl = "https://studio-xrrxbujekrnwxifhcszyx7.streamlit.app";
+  const streamlitUrl = "studio-ixvf53xksdscwu3rucuyry..streamlit.app";
 
   return (
     <main className="flex-grow container mx-auto px-4 py-8 flex flex-col">
