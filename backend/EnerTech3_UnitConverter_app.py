@@ -1,10 +1,12 @@
 
 import base64
+import os
 import streamlit as st
 
 APP_TITLE = "EnerTech3 | Conversor Universal"
 TAGLINE = "Energía y tecnología en sincronía"
-LOGO_PATH = "logo_enertech3.png"  # replace with your path if hosting elsewhere
+script_dir = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(script_dir, "logo_enertech3.png")
 
 def load_logo_b64(path: str) -> str:
     try:
