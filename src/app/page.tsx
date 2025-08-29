@@ -5,6 +5,7 @@ import { Footer } from "@/components/footer";
 import { AppCard } from "@/components/app-card";
 import { LayoutTemplate, Sprout, Target, View } from "lucide-react";
 
+
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-white">
