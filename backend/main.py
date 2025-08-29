@@ -1,16 +1,92 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+# d:\4. VSCode Projects\studio\backend\main.py
 
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Dict
+
+# --- 1. Define the data model for the request ---
+# This must match the JSON sent from the frontend
+class ConversionRequest(BaseModel):
+    value: float
+    category: str
+    from_unit: str
+    to_unit: str
+
+# --- 2. Define conversion factors with English keys ---
+# This now matches the CONVERSION_DATA in the React component
+CONVERSION_FACTORS: Dict[str, Dict[str, float]] = {
+    "Length": {
+        "meter (m)": 1, "kilometer (km)": 1000, "centimeter (cm)": 0.01,
+        "millimeter (mm)": 0.001, "micrometer (µm)": 1e-6, "nanometer (nm)": 1e-9,
+        "inch (in)": 0.0254, "foot (ft)": 0.3048, "yard (yd)": 0.9144,
+        "mile (mi)": 1609.344, "nautical mile (nmi)": 1852,
+    },
+    "Mass": {
+        "kilogram (kg)": 1, "gram (g)": 0.001, "milligram (mg)": 1e-6,
+        "microgram (µg)": 1e-9, "metric ton (t)": 1000,
+        "US short ton (ton US)": 907.18474, "pound (lb)": 0.45359237,
+        "ounce (oz)": 0.028349523125,
+    },
+    "Time": {
+        "second (s)": 1, "millisecond (ms)": 1e-3, "microsecond (µs)": 1e-6,
+        "minute (min)": 60, "hour (h)": 3600, "day (d)": 86400, "week (wk)": 604800,
+    },
+    "Electric Current": {
+        "ampere (A)": 1, "milliampere (mA)": 1e-3, "microampere (µA)": 1e-6,
+        "kiloampere (kA)": 1e3,
+    },
+    "Amount of Substance": {
+        "mole (mol)": 1, "millimole (mmol)": 1e-3, "micromole (µmol)": 1e-6,
+    },
+    "Luminous Intensity": {
+        "candela (cd)": 1, "millicandela (mcd)": 1e-3, "kilocandela (kcd)": 1e3,
+    }
+}
+
+# --- 3. Conversion logic functions ---
+def convert_linear(value: float, factors: dict, u_from: str, u_to: str) -> float:
+    value_si = value * factors[u_from]
+    return value_si / factors[u_to]
+
+def convert_temperature(value: float, u_from: str, u_to: str) -> float:
+    if u_from == u_to:
+        return value
+    # Convert to Kelvin first
+    k = 0.0
+    if u_from.startswith("Celsius"):
+        k = value + 273.15
+    elif u_from.startswith("Fahrenheit"):
+        k = (value - 32) * 5.0/9.0 + 273.15
+    else:  # Already Kelvin
+        k = value
+    
+    # Convert from Kelvin to target unit
+    if u_to.startswith("Celsius"):
+        return k - 273.15
+    elif u_to.startswith("Fahrenheit"):
+        return (k - 273.15) * 9.0/5.0 + 32
+    else: # Return Kelvin
+        return k
+
+def format_number(x: float) -> str:
+    if x == 0:
+        return "0"
+    if abs(x) < 1e-4 or abs(x) >= 1e7:
+        return f"{x:.6e}"
+    return f"{x:.6f}".rstrip('0').rstrip('.')
+
+# --- 4. Create the FastAPI app ---
 app = FastAPI()
 
-# --- CORS (Cross-Origin Resource Sharing) ---
-# This allows your frontend (e.g., at localhost:3000) to make requests to this backend (at localhost:8000).
-# In production, you should restrict this to your frontend's domain.
+# --- 5. Configure CORS ---
+# This allows your React app (running on http://localhost:3000)
+# to make requests to this API (running on http://localhost:8000)
 origins = [
-    "*", # For debugging, we allow any origin.
+    "http://localhost:3000",
+    "http://localhost:3001", # Add other origins if needed
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -19,86 +95,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- CONVERSION LOGIC (Extracted from your Streamlit app) ---
-
-# 1. Conversion factors
-LENGTH = {"meter (m)": 1, "kilometer (km)": 1000, "centimeter (cm)": 0.01, "millimeter (mm)": 0.001, "micrometer (µm)": 1e-6, "nanometer (nm)": 1e-9, "inch (in)": 0.0254, "foot (ft)": 0.3048, "yard (yd)": 0.9144, "mile (mi)": 1609.344, "nautical mile (nmi)": 1852}
-MASS = {"kilogram (kg)": 1, "gram (g)": 0.001, "milligram (mg)": 1e-6, "microgram (µg)": 1e-9, "metric ton (t)": 1000, "US short ton (ton US)": 907.18474, "pound (lb)": 0.45359237, "ounce (oz)": 0.028349523125}
-TIME = {"second (s)": 1, "millisecond (ms)": 1e-3, "microsecond (µs)": 1e-6, "minute (min)": 60, "hour (h)": 3600, "day (d)": 86400, "week (wk)": 604800}
-CURRENT = {"ampere (A)": 1, "milliampere (mA)": 1e-3, "microampere (µA)": 1e-6, "kiloampere (kA)": 1e3}
-AMOUNT = {"mole (mol)": 1, "millimole (mmol)": 1e-3, "micromole (µmol)": 1e-6}
-LUMINOUS = {"candela (cd)": 1, "millicandela (mcd)": 1e-3, "kilocandela (kcd)": 1e3}
-TEMP_UNITS = ["Celsius (°C)", "Fahrenheit (°F)", "Kelvin (K)"]
-
-# A map to find the correct factors dictionary
-FACTOR_MAP = {
-    "Length": LENGTH,
-    "Mass": MASS,
-    "Time": TIME,
-    "Electric Current": CURRENT,
-    "Amount of Substance": AMOUNT,
-    "Luminous Intensity": LUMINOUS,
-}
-
-# 2. Conversion functions
-def to_si(value: float, factors: dict, unit_from: str) -> float:
-    return value * factors[unit_from]
-
-def from_si(value_si: float, factors: dict, unit_to: str) -> float:
-    return value_si / factors[unit_to]
-
-def convert_linear(value: float, factors: dict, u_from: str, u_to: str) -> float:
-    return from_si(to_si(value, factors, u_from), factors, u_to)
-
-def convert_temperature(value: float, u_from: str, u_to: str) -> float:
-    if u_from == u_to: return value
-    if u_from.startswith("Celsius"): k = value + 273.15
-    elif u_from.startswith("Fahrenheit"): k = (value - 32) * 5.0/9.0 + 273.15
-    else: k = value
-    if u_to.startswith("Celsius"): return k - 273.15
-    elif u_to.startswith("Fahrenheit"): return (k - 273.15) * 9.0/5.0 + 32
-    else: return k
-
-# --- API (The "Gateway" for the web) ---
-
-# Formatting function extracted from your Streamlit app
-def format_number(x: float) -> str:
-    if x == 0:
-        return "0"
-    if abs(x) < 1e-3 or abs(x) >= 1e6:
-        return f"{x:.6e}"
-    if abs(x) < 1:
-        return f"{x:.6f}".rstrip('0').rstrip('.')
-    return f"{x:,.6f}".rstrip('0').rstrip('.')
-
-# Defines the structure of the data the web should send
-class ConversionRequest(BaseModel):
-    value: float
-    category: str # e.g., "Mass", "Length", "Temperature"
-    fromUnit: str
-    toUnit: str
-
-# This is the URL your frontend will call.
-# When a request arrives at "/api/convert", this function will be executed.
+# --- 6. Define the API endpoint ---
 @app.post("/api/convert")
-def convert(request: ConversionRequest):
+async def convert_units(data: ConversionRequest):
+    category = data.category
+    value = data.value
+    unit_from = data.from_unit
+    unit_to = data.to_unit
+    
     try:
-        if request.category == "Temperature":
-            result = convert_temperature(request.value, request.fromUnit, request.toUnit)
+        if category == "Temperature":
+            result = convert_temperature(value, unit_from, unit_to)
         else:
-            factors = FACTOR_MAP.get(request.category)
+            factors = CONVERSION_FACTORS.get(category)
             if not factors:
-                raise ValueError(f"Invalid conversion category: {request.category}")
-            
-            result = convert_linear(request.value, factors, request.fromUnit, request.toUnit)
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": f"Invalid conversion category: '{category}'"}
+                )
+            result = convert_linear(value, factors, unit_from, unit_to)
         
-        formatted_result = format_number(result)
-        
-        # KEY LINE! Make sure your code returns the formatted result.
-        return {"result": formatted_result}
+        return {"result": format_number(result)}
 
-    except Exception as e:
-        return JSONResponse(
+    except KeyError as e:
+        # This happens if a unit is not found in the factors dictionary
+        raise HTTPException(
             status_code=400,
-            content={"error": str(e)}
+            detail={"error": f"Invalid unit for this category: {e}"}
         )
+    except Exception as e:
+        # Generic error for any other issues
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"An unexpected error occurred: {str(e)}"}
+        )
+
+if __name__ == "__main__":
+    import uvicorn
+    print("Starting Uvicorn server for development...")
+    # This allows running the app directly with `python main.py`
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
