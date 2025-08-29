@@ -1,29 +1,28 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { Sprout, ArrowRightLeft } from "lucide-react";
 
-// 1. Definimos todas las unidades y categorías, igual que en el backend de Python
+// 1. Define all units and categories, same as in the Python backend
 const CONVERSION_DATA: Record<string, string[]> = {
-  "Longitud": [
-    "metro (m)", "kilómetro (km)", "centímetro (cm)", "milímetro (mm)",
-    "micrómetro (µm)", "nanómetro (nm)", "pulgada (in)", "pie (ft)",
-    "yarda (yd)", "milla (mi)", "milla náutica (nmi)",
+  "Length": [
+    "meter (m)", "kilometer (km)", "centimeter (cm)", "millimeter (mm)",
+    "micrometer (µm)", "nanometer (nm)", "inch (in)", "foot (ft)",
+    "yard (yd)", "mile (mi)", "nautical mile (nmi)",
   ],
-  "Masa": [
-    "kilogramo (kg)", "gramo (g)", "miligramo (mg)", "microgramo (µg)",
-    "tonelada métrica (t)", "tonelada corta EUA (ton US)", "libra (lb)", "onza (oz)",
+  "Mass": [
+    "kilogram (kg)", "gram (g)", "milligram (mg)", "microgram (µg)",
+    "metric ton (t)", "US short ton (ton US)", "pound (lb)", "ounce (oz)",
   ],
-  "Tiempo": [
-    "segundo (s)", "milisegundo (ms)", "microsegundo (µs)", "minuto (min)",
-    "hora (h)", "día (d)", "semana (wk)",
+  "Time": [
+    "second (s)", "millisecond (ms)", "microsecond (µs)", "minute (min)",
+    "hour (h)", "day (d)", "week (wk)",
   ],
-  "Corriente eléctrica": [
+  "Electric Current": [
     "ampere (A)", "milliampere (mA)", "microampere (µA)", "kiloampere (kA)",
   ],
-  "Temperatura": ["Celsius (°C)", "Fahrenheit (°F)", "Kelvin (K)"],
-  "Cantidad de sustancia": ["mol (mol)", "milimol (mmol)", "micromol (µmol)"],
-  "Intensidad luminosa": [
+  "Temperature": ["Celsius (°C)", "Fahrenheit (°F)", "Kelvin (K)"],
+  "Amount of Substance": ["mole (mol)", "millimole (mmol)", "micromole (µmol)"],
+  "Luminous Intensity": [
     "candela (cd)", "millicandela (mcd)", "kilocandela (kcd)",
   ],
 };
@@ -31,7 +30,7 @@ const CONVERSION_DATA: Record<string, string[]> = {
 const CATEGORIES = Object.keys(CONVERSION_DATA);
 
 export default function UniversalConverterPage() {
-  // 2. Estado inicial para la nueva interfaz dinámica
+  // 2. Initial state for the new dynamic interface
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [inputValue, setInputValue] = useState("1");
   const [debouncedInputValue, setDebouncedInputValue] = useState(inputValue);
@@ -43,7 +42,7 @@ export default function UniversalConverterPage() {
 
   const currentUnits = CONVERSION_DATA[category];
 
-  // 3. Función para manejar el cambio de categoría
+  // 3. Function to handle category change
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
     const newUnits = CONVERSION_DATA[newCategory];
@@ -54,31 +53,31 @@ export default function UniversalConverterPage() {
     setError("");
   };
 
-  // Nueva función para intercambiar unidades
+  // New function to swap units
   const handleSwapUnits = () => {
     if (fromUnit === toUnit) return;
-    // Intercambia las unidades
+    // Swap the units
     setFromUnit(toUnit);
     setToUnit(fromUnit);
-    // Usa el resultado anterior como el nuevo valor de entrada
+    // Use the previous result as the new input value
     if (result && !error) {
       setInputValue(result);
     }
   };
 
-  // Optimización: Retrasar la llamada a la API hasta que el usuario deje de escribir
+  // Optimization: Delay the API call until the user stops typing
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedInputValue(inputValue);
-    }, 300); // Espera 300ms después de la última pulsación de tecla
+    }, 300); // Wait 300ms after the last keystroke
 
-    // Limpia el temporizador si el usuario sigue escribiendo
+    // Clear the timer if the user is still typing
     return () => {
       clearTimeout(handler);
     };
   }, [inputValue]);
 
-  // 4. useEffect actualizado para llamar a la API con la categoría
+  // 4. useEffect updated to call the API with the category
   useEffect(() => {
     const handleConversion = async () => {
       const numericValue = parseFloat(debouncedInputValue);
@@ -113,13 +112,13 @@ export default function UniversalConverterPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'La conversión falló');
+          throw new Error(data.error || 'Conversion failed');
         }
         setResult(data.result);
       } catch (error: any) {
         console.error(error);
         if (error instanceof TypeError && error.message === 'Failed to fetch') {
-          setError('No se pudo conectar al servidor. ¿Está el backend de Python en ejecución?');
+          setError('Could not connect to the server. Is the Python backend running?');
         } else {
           setError(error.message);
         }
@@ -142,7 +141,7 @@ export default function UniversalConverterPage() {
       <div className="bg-white p-8 rounded-lg shadow-md max-w-4xl mx-auto">
         <div className="mb-6">
           <label htmlFor="category-select" className="block mb-2 font-semibold text-gray-700">
-            Selecciona una categoría de conversión
+            Select a conversion category
           </label>
           <select
             id="category-select"
@@ -161,7 +160,7 @@ export default function UniversalConverterPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-end">
             <div className="flex flex-col">
-              <label htmlFor="from-unit" className="mb-2 font-semibold text-gray-700">Desde</label>
+              <label htmlFor="from-unit" className="mb-2 font-semibold text-gray-700">From</label>
               <select id="from-unit" value={fromUnit} onChange={(e) => setFromUnit(e.target.value)} className="p-2 border rounded-md w-full">
                 {currentUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
               </select>
@@ -171,14 +170,14 @@ export default function UniversalConverterPage() {
               <button
                 onClick={handleSwapUnits}
                 className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                aria-label="Intercambiar unidades"
+                aria-label="Swap units"
               >
                 <ArrowRightLeft className="h-5 w-5" />
               </button>
             </div>
 
             <div className="flex flex-col">
-              <label htmlFor="to-unit" className="mb-2 font-semibold text-gray-700">Hacia</label>
+              <label htmlFor="to-unit" className="mb-2 font-semibold text-gray-700">To</label>
               <select id="to-unit" value={toUnit} onChange={(e) => setToUnit(e.target.value)} className="p-2 border rounded-md w-full">
                 {currentUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
               </select>
@@ -194,7 +193,13 @@ export default function UniversalConverterPage() {
               className="p-2 border rounded-md w-full text-lg"
             />
             <div className="p-2 border rounded-md w-full bg-gray-100 text-lg font-bold text-gray-800 min-h-[42px] flex items-center justify-end">
-              {isLoading ? 'Calculando...' : error ? <span className="text-red-500 text-sm">{error}</span> : result}
+              {isLoading ? (
+                <div className="h-6 bg-gray-300 rounded-md w-3/4 animate-pulse"></div>
+              ) : error ? (
+                <span className="text-red-500 text-sm">{error}</span>
+              ) : (
+                result
+              )}
             </div>
           </div>
         </div>

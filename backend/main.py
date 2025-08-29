@@ -6,9 +6,10 @@ from fastapi.responses import JSONResponse
 app = FastAPI()
 
 # --- CORS (Cross-Origin Resource Sharing) ---
-# Esto permite que tu frontend (en localhost:3000) pueda hacer peticiones a este backend (en localhost:8000).
+# This allows your frontend (e.g., at localhost:3000) to make requests to this backend (at localhost:8000).
+# In production, you should restrict this to your frontend's domain.
 origins = [
-    "*", # Para depuración, permitimos cualquier origen.
+    "*", # For debugging, we allow any origin.
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -18,28 +19,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- LÓGICA DE CONVERSIÓN (Extraída de tu app Streamlit) ---
+# --- CONVERSION LOGIC (Extracted from your Streamlit app) ---
 
-# 1. Factores de conversión
-LENGTH = {"metro (m)": 1, "kilómetro (km)": 1000, "centímetro (cm)": 0.01, "milímetro (mm)": 0.001, "micrómetro (µm)": 1e-6, "nanómetro (nm)": 1e-9, "pulgada (in)": 0.0254, "pie (ft)": 0.3048, "yarda (yd)": 0.9144, "milla (mi)": 1609.344, "milla náutica (nmi)": 1852}
-MASS = {"kilogramo (kg)": 1, "gramo (g)": 0.001, "miligramo (mg)": 1e-6, "microgramo (µg)": 1e-9, "tonelada métrica (t)": 1000, "tonelada corta EUA (ton US)": 907.18474, "libra (lb)": 0.45359237, "onza (oz)": 0.028349523125}
-TIME = {"segundo (s)": 1, "milisegundo (ms)": 1e-3, "microsegundo (µs)": 1e-6, "minuto (min)": 60, "hora (h)": 3600, "día (d)": 86400, "semana (wk)": 604800}
+# 1. Conversion factors
+LENGTH = {"meter (m)": 1, "kilometer (km)": 1000, "centimeter (cm)": 0.01, "millimeter (mm)": 0.001, "micrometer (µm)": 1e-6, "nanometer (nm)": 1e-9, "inch (in)": 0.0254, "foot (ft)": 0.3048, "yard (yd)": 0.9144, "mile (mi)": 1609.344, "nautical mile (nmi)": 1852}
+MASS = {"kilogram (kg)": 1, "gram (g)": 0.001, "milligram (mg)": 1e-6, "microgram (µg)": 1e-9, "metric ton (t)": 1000, "US short ton (ton US)": 907.18474, "pound (lb)": 0.45359237, "ounce (oz)": 0.028349523125}
+TIME = {"second (s)": 1, "millisecond (ms)": 1e-3, "microsecond (µs)": 1e-6, "minute (min)": 60, "hour (h)": 3600, "day (d)": 86400, "week (wk)": 604800}
 CURRENT = {"ampere (A)": 1, "milliampere (mA)": 1e-3, "microampere (µA)": 1e-6, "kiloampere (kA)": 1e3}
-AMOUNT = {"mol (mol)": 1, "milimol (mmol)": 1e-3, "micromol (µmol)": 1e-6}
+AMOUNT = {"mole (mol)": 1, "millimole (mmol)": 1e-3, "micromole (µmol)": 1e-6}
 LUMINOUS = {"candela (cd)": 1, "millicandela (mcd)": 1e-3, "kilocandela (kcd)": 1e3}
 TEMP_UNITS = ["Celsius (°C)", "Fahrenheit (°F)", "Kelvin (K)"]
 
-# Un mapa para encontrar el diccionario de factores correcto
+# A map to find the correct factors dictionary
 FACTOR_MAP = {
-    "Longitud": LENGTH,
-    "Masa": MASS,
-    "Tiempo": TIME,
-    "Corriente eléctrica": CURRENT,
-    "Cantidad de sustancia": AMOUNT,
-    "Intensidad luminosa": LUMINOUS,
+    "Length": LENGTH,
+    "Mass": MASS,
+    "Time": TIME,
+    "Electric Current": CURRENT,
+    "Amount of Substance": AMOUNT,
+    "Luminous Intensity": LUMINOUS,
 }
 
-# 2. Funciones de conversión
+# 2. Conversion functions
 def to_si(value: float, factors: dict, unit_from: str) -> float:
     return value * factors[unit_from]
 
@@ -58,9 +59,9 @@ def convert_temperature(value: float, u_from: str, u_to: str) -> float:
     elif u_to.startswith("Fahrenheit"): return (k - 273.15) * 9.0/5.0 + 32
     else: return k
 
-# --- API (La "Puerta de Entrada" para la web) ---
+# --- API (The "Gateway" for the web) ---
 
-# Función de formato extraída de tu app Streamlit
+# Formatting function extracted from your Streamlit app
 def format_number(x: float) -> str:
     if x == 0:
         return "0"
@@ -70,36 +71,33 @@ def format_number(x: float) -> str:
         return f"{x:.6f}".rstrip('0').rstrip('.')
     return f"{x:,.6f}".rstrip('0').rstrip('.')
 
-# Define la estructura de los datos que la web debe enviar
+# Defines the structure of the data the web should send
 class ConversionRequest(BaseModel):
     value: float
-    category: str # Ej: "Masa", "Longitud", "Temperatura"
+    category: str # e.g., "Mass", "Length", "Temperature"
     fromUnit: str
     toUnit: str
 
-# Esta es la URL que tu frontend llamará.
-# Cuando llegue una petición a "/api/convert", se ejecutará esta función.
+# This is the URL your frontend will call.
+# When a request arrives at "/api/convert", this function will be executed.
 @app.post("/api/convert")
 def convert(request: ConversionRequest):
     try:
-        # Decide qué función de conversión usar basado en la categoría
-        if request.category == "Temperatura":
+        if request.category == "Temperature":
             result = convert_temperature(request.value, request.fromUnit, request.toUnit)
         else:
-            # Busca el diccionario de factores correcto (ej: MASS, LENGTH)
             factors = FACTOR_MAP.get(request.category)
             if not factors:
-                # Si la categoría no existe, devuelve un error
-                raise ValueError(f"Categoría de conversión no válida: {request.category}")
+                raise ValueError(f"Invalid conversion category: {request.category}")
             
             result = convert_linear(request.value, factors, request.fromUnit, request.toUnit)
         
         formatted_result = format_number(result)
-        # Devuelve el resultado en un formato que la web entiende (JSON)
+        
+        # KEY LINE! Make sure your code returns the formatted result.
         return {"result": formatted_result}
 
     except Exception as e:
-        # Si algo sale mal (ej: una unidad no existe), devuelve un error claro.
         return JSONResponse(
             status_code=400,
             content={"error": str(e)}
