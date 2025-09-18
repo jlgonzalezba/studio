@@ -21,7 +21,7 @@ const colorClasses = {
 export function AppCard({ icon: Icon, title, description, color }: AppCardProps) {
   const colorClass = color ? colorClasses[color] : colorClasses.default;
   return (
-    <Card className="bg-card shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-emphasized flex flex-col border">
+    <Card className="bg-card shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-emphasized flex flex-col border min-h-[250px]">
       <CardHeader className="p-7 pb-4">
         <div className={cn("w-14 h-14 flex items-center justify-center rounded-2xl mb-4 shrink-0", colorClass)}>
           <Icon className="w-8 h-8" />
@@ -36,3 +36,4 @@ export function AppCard({ icon: Icon, title, description, color }: AppCardProps)
     </Card>
   );
 }
+
