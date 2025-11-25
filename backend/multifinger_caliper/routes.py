@@ -35,12 +35,16 @@ async def upload_and_process_las(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las")
 
     try:
+        print(f"[UPLOAD] Received file: {file.filename}")
         # Lee el contenido del archivo subido en memoria
         contents = await file.read()
+        print(f"[UPLOAD] File size: {len(contents)} bytes")
 
         # Descomprimir si es .gz
         if file.filename.endswith('.gz'):
+            print("[UPLOAD] Decompressing .gz file")
             contents = gzip.decompress(contents)
+            print(f"[UPLOAD] Decompressed size: {len(contents)} bytes")
 
         # Decodifica el contenido (mismo código que antes)
         decoded_content = None
@@ -60,26 +64,35 @@ async def upload_and_process_las(file: UploadFile = File(...)):
         file_like_object = io.StringIO(decoded_content)
         las = lasio.read(file_like_object)
 
+        print("[UPLOAD] Processing LAS data")
         # Procesa con la función mínima
         result = process_las_data(las)
+        print("[UPLOAD] LAS data processed successfully")
 
         # Exportar curvas a CSV automáticamente (original y centralizado)
         try:
+            print("[UPLOAD] Exporting CSV")
             csv_paths = export_las_curves_to_csv(las)
             result["csv_exported"] = csv_paths
+            print("[UPLOAD] CSV exported successfully")
         except Exception as e:
+            print(f"[UPLOAD] CSV export error: {e}")
             result["csv_error"] = str(e)
 
+        print("[UPLOAD] Upload completed successfully")
         return result
 
-    except UnicodeDecodeError:
+    except UnicodeDecodeError as e:
+        print(f"[UPLOAD] Unicode decode error: {e}")
         raise HTTPException(status_code=400, detail="ERROR: El archivo .las debe estar en formato UTF-8. Convierta el archivo a UTF-8 e intente nuevamente.")
     except ValueError as e:
+        print(f"[UPLOAD] Value error: {e}")
         if "LAS" in str(e):
             raise HTTPException(status_code=400, detail=f"ERROR: Formato LAS inválido - {str(e)}")
         raise HTTPException(status_code=400, detail=f"ERROR: Datos inválidos en el archivo - {str(e)}")
     except Exception as e:
         # Si algo sale mal durante el procesamiento, devuelve un error
+        print(f"[UPLOAD] General error: {e}")
         error_msg = str(e)
         if "No curves" in error_msg or "empty" in error_msg.lower():
             raise HTTPException(status_code=400, detail="ERROR: El archivo .las no contiene curvas válidas o está vacío.")
