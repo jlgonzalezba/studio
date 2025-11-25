@@ -1,5 +1,5 @@
 // Firebase configuration
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, Analytics } from 'firebase/analytics';
@@ -14,18 +14,17 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
-
-// Initialize Cloud Firestore and get a reference to the service
-export const db = getFirestore(app);
-
-// Initialize Firebase Analytics (only on client side)
+// Initialize Firebase only on client side or if config is valid
+let app: any = null;
+let auth: any = null;
+let db: any = null;
 let analytics: Analytics | null = null;
-if (typeof window !== 'undefined') {
+
+if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  auth = getAuth(app);
+  db = getFirestore(app);
+
   try {
     analytics = getAnalytics(app);
   } catch (error) {
@@ -33,5 +32,5 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export { analytics };
+export { auth, db, analytics };
 export default app;

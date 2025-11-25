@@ -7,6 +7,8 @@ import { auth, db } from '@/lib/firebase';
 
 export function AuthListener() {
   useEffect(() => {
+    if (!auth || !db) return; // Firebase not initialized
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Check if email verification status changed
