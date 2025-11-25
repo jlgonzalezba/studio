@@ -982,47 +982,50 @@ export default function MultifingerCaliperPage() {
       formData.append("file", file);
 
       try {
-        // Asegúrate de que tu backend de Python esté corriendo en esta URL
-        // Simular progreso de carga para mejor UX
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-          progress += Math.random() * 15; // Incremento aleatorio
-          if (progress >= 90) {
-            progress = 90; // No llegar al 100% hasta que termine
-            clearInterval(progressInterval);
-          }
-          setUploadProgress(Math.round(progress));
-        }, 200);
+        // Usar XMLHttpRequest para rastrear progreso real de subida
+        const xhr = new XMLHttpRequest();
 
-        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
-          method: "POST",
-          body: formData,
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+            setUploadProgress(Math.round(percentComplete));
+          }
         });
 
-        // Limpiar intervalo y completar progreso
-        clearInterval(progressInterval);
-        setUploadProgress(100);
+        xhr.addEventListener('load', async () => {
+          if (xhr.status === 200) {
+            setUploadProgress(100);
+            const data = JSON.parse(xhr.responseText);
+            console.log("Respuesta del backend:", data);
 
-        const data = await response.json();
-        console.log("Respuesta del backend:", data);
+            if (data.detail && data.detail.startsWith("ERROR:")) {
+              throw new Error(data.detail.replace("ERROR: ", ""));
+            }
 
-        if (!response.ok) {
-           // Si el backend devuelve un error específico, mostrarlo
-           if (data.detail && data.detail.startsWith("ERROR:")) {
-             throw new Error(data.detail.replace("ERROR: ", ""));
-           }
-           throw new Error("Error al procesar el archivo en el backend.");
-         }
+            // Count number of fingers (R curves)
+            const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+            const numFingers = rCurves.length;
 
-         // Count number of fingers (R curves)
-         const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-         const numFingers = rCurves.length;
+            updateState({
+              fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+              fileLoaded: true,
+              isProcessed: false
+            });
+          } else {
+            const errorData = JSON.parse(xhr.responseText);
+            if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
+              throw new Error(errorData.detail.replace("ERROR: ", ""));
+            }
+            throw new Error("Error al procesar el archivo en el backend.");
+          }
+        });
 
-         updateState({
-           fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
-           fileLoaded: true,
-           isProcessed: false
-         });
+        xhr.addEventListener('error', () => {
+          throw new Error("Could not connect to the backend or process the file. Make sure the Python server is running.");
+        });
+
+        xhr.open('POST', 'https://studio-2lx4.onrender.com/api/multifinger-caliper/upload');
+        xhr.send(formData);
 
       } catch (err: any) {
         console.error(err);
@@ -1046,17 +1049,6 @@ export default function MultifingerCaliperPage() {
       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-      // Simular progreso de procesamiento para mejor UX
-      let progress = 0;
-      const progressInterval = setInterval(() => {
-        progress += Math.random() * 10; // Incremento aleatorio más lento
-        if (progress >= 95) {
-          progress = 95; // No llegar al 100% hasta que termine
-          clearInterval(progressInterval);
-        }
-        setProcessProgress(Math.round(progress));
-      }, 300);
-
       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
         method: "POST",
         headers: {
@@ -1065,8 +1057,6 @@ export default function MultifingerCaliperPage() {
         body: JSON.stringify({ use_centralized: useCentralized }),
       });
 
-      // Limpiar intervalo y completar progreso
-      clearInterval(progressInterval);
       setProcessProgress(100);
 
       const data = await response.json();
