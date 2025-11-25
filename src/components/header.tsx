@@ -1,11 +1,45 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
-import { Menu } from 'lucide-react';
+import { Menu, LogOut, User } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 export function Header() {
+  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+      router.push('/login');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error logging out",
+        variant: "destructive",
+      });
+    }
+  };
+
   const navLinks = [
     { href: "#", label: "News" },
     { href: "#", label: "Contact Us" },
@@ -19,11 +53,24 @@ export function Header() {
           {navLinks.map((link) => (
              <Link key={link.label} href={link.href} className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors">
               {link.label}
-            </Link>
+             </Link>
           ))}
-          <Button asChild>
-            <Link href="/login">Login</Link>
-          </Button>
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4" />
+                <span>{user.email}</span>
+              </div>
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          ) : (
+            <Button asChild>
+              <Link href="/login">Login</Link>
+            </Button>
+          )}
         </nav>
         <div className="md:hidden">
           <Sheet>
@@ -39,12 +86,25 @@ export function Header() {
                 <nav className="mt-8 flex flex-col gap-6">
                    {navLinks.map((link) => (
                     <Link key={link.label} href={link.href} className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors">
-                      {link.label}
+                     {link.label}
                     </Link>
                   ))}
-                  <Button asChild className="w-full">
-                    <Link href="/login">Login</Link>
-                  </Button>
+                  {user ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-4 w-4" />
+                        <span>{user.email}</span>
+                      </div>
+                      <Button variant="outline" onClick={handleLogout} className="w-full">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button asChild className="w-full">
+                      <Link href="/login">Login</Link>
+                    </Button>
+                  )}
                 </nav>
               </div>
             </SheetContent>
