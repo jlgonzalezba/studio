@@ -982,6 +982,8 @@ export default function MultifingerCaliperPage() {
       formData.append("file", file);
 
       try {
+        setUploadProgress(5); // Show progress bar immediately
+
         // Usar XMLHttpRequest para rastrear progreso real de subida
         const xhr = new XMLHttpRequest();
 
@@ -1009,7 +1011,8 @@ export default function MultifingerCaliperPage() {
             updateState({
               fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
               fileLoaded: true,
-              isProcessed: false
+              isProcessed: false,
+              isLoading: false
             });
           } else {
             const errorData = JSON.parse(xhr.responseText);
@@ -1043,7 +1046,7 @@ export default function MultifingerCaliperPage() {
     const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
       console.log("Procesando datos del caliper...");
       updateState({ isProcessing: true, error: null });
-      setProcessProgress(0);
+      setProcessProgress(5); // Show progress bar immediately
 
      try {
        // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
