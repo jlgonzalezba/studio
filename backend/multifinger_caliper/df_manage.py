@@ -374,11 +374,18 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
     Returns:
         Dict con todos los datos procesados para el frontend
     """
+    # Importar y actualizar progreso
+    from .routes import processing_progress
+
+    processing_progress = 10
+
     # Obtener el CSV más reciente (centralizado u original según el parámetro)
     df, filename = get_latest_csv_dataframe(use_centralized)
 
     if df is None:
         return {"error": "No se pudo cargar el archivo CSV más reciente"}
+
+    processing_progress = 20
 
     # Detectar curvas R
     r_curves_info = detect_r_curves(df)
@@ -391,6 +398,8 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
             "available_columns": list(df.columns)
         }
 
+    processing_progress = 30
+
     # Calcular estadísticas
     stats_result = calculate_caliper_statistics(df, r_curves_info)
 
@@ -401,9 +410,13 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
             "r_curves_info": r_curves_info
         }
 
+    processing_progress = 50
+
     # Extraer datos crudos de profundidad y R
     raw_data = extract_depth_and_r_values(df)
     print(f"[DEBUG] Raw data extracted: depth_points={raw_data.get('total_points', 0)}, r_curves={len(raw_data.get('r_curves', []))}")
+
+    processing_progress = 70
 
     # Importar y calcular collars data - ejecutar joints.py si es necesario
     try:
@@ -444,6 +457,8 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
                     print(f"[WARNING] Error generating statistics: {result_stats.stderr}")
             except Exception as e:
                 print(f"[WARNING] Could not execute statistics.py: {e}")
+
+        processing_progress = 90
 
         if os.path.exists(collars_path):
             collars_df = pd.read_csv(collars_path)

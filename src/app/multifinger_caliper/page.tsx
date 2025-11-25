@@ -1040,24 +1040,40 @@ export default function MultifingerCaliperPage() {
   };
 
   // Función para manejar el botón "Process Data"
-   const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
-     console.log("Procesando datos del caliper...");
-     updateState({ isProcessing: true, error: null });
-     setProcessProgress(0);
+    const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
+      console.log("Procesando datos del caliper...");
+      updateState({ isProcessing: true, error: null });
+      setProcessProgress(0);
 
-    try {
-      // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
-      const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
+     try {
+       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
+       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-      const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ use_centralized: useCentralized }),
-      });
+       // Iniciar polling del progreso
+       const progressInterval = setInterval(async () => {
+         try {
+           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
+           const progressData = await progressResponse.json();
+           setProcessProgress(progressData.progress);
+           if (progressData.progress >= 100) {
+             clearInterval(progressInterval);
+           }
+         } catch (e) {
+           console.error("Error fetching progress:", e);
+         }
+       }, 500);
 
-      setProcessProgress(100);
+       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+         },
+         body: JSON.stringify({ use_centralized: useCentralized }),
+       });
+
+       // Limpiar el intervalo y asegurar 100%
+       clearInterval(progressInterval);
+       setProcessProgress(100);
 
       const data = await response.json();
       console.log("Respuesta del procesamiento:", data);

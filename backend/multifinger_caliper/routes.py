@@ -20,6 +20,9 @@ from .df_manage import process_caliper_data
 # Create router for multifinger caliper endpoints
 router = APIRouter(prefix="/api/multifinger-caliper", tags=["multifinger-caliper"])
 
+# Global progress variable for processing
+processing_progress = 0
+
 
 @router.post("/upload")
 async def upload_and_process_las(file: UploadFile = File(...)):
@@ -90,18 +93,29 @@ async def process_caliper(request: ProcessCaliperRequest):
     Args:
         request: ProcessCaliperRequest con el parámetro use_centralized
     """
+    global processing_progress
+    processing_progress = 0
+
     try:
         result = process_caliper_data(request.use_centralized)
 
         if "error" in result:
             raise HTTPException(status_code=400, detail=f"ERROR: {result['error']}")
 
+        processing_progress = 100
         return result
 
     except Exception as e:
         error_msg = str(e)
         raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar datos del caliper - {error_msg}")
 
+
+@router.get("/progress")
+async def get_progress():
+    """
+    Get current processing progress.
+    """
+    return {"progress": processing_progress}
 
 @router.get("/health")
 async def health_check():
