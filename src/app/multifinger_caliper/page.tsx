@@ -1157,7 +1157,7 @@ export default function MultifingerCaliperPage() {
               </button>
 
               {/* Progress bar for upload */}
-              {isLoading && (
+              {isLoading && uploadProgress > 0 && (
                 <div className="w-full max-w-md">
                   <div className="bg-gray-200 rounded-full h-2.5">
                     <div
@@ -1190,7 +1190,7 @@ export default function MultifingerCaliperPage() {
                 </button>
 
                 {/* Progress bar for processing */}
-                {isProcessing && (
+                {isProcessing && processProgress > 0 && (
                   <div className="w-full max-w-md">
                     <div className="bg-gray-200 rounded-full h-2.5">
                       <div
