@@ -994,7 +994,7 @@ export default function MultifingerCaliperPage() {
           setUploadProgress(Math.round(progress));
         }, 200);
 
-        const response = await fetch("http://127.0.0.1:8000/api/multifinger-caliper/upload", {
+        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
           method: "POST",
           body: formData,
         });
@@ -1057,7 +1057,7 @@ export default function MultifingerCaliperPage() {
         setProcessProgress(Math.round(progress));
       }, 300);
 
-      const response = await fetch("http://127.0.0.1:8000/api/multifinger-caliper/process-caliper", {
+      const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
