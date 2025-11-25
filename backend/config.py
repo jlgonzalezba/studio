@@ -19,6 +19,7 @@ CORS_ORIGINS = [
     "http://127.0.0.1:9002",
     "http://127.0.0.1:9003",
     "http://192.168.0.140:9002",
+    "https://www.enertech3.com",
 ]
 
 # API Configuration
