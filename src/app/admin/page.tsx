@@ -12,6 +12,8 @@ import {
 import { collection, getDocs, updateDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 interface PendingUser {
   id: string;
@@ -24,11 +26,24 @@ interface PendingUser {
 export default function AdminPanel() {
   const [allUsers, setAllUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchAllUsers();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user && user.email === "admin@enertech3.com") {
+      fetchAllUsers();
+    }
+  }, [user]);
 
   const fetchAllUsers = async () => {
     try {
@@ -88,6 +103,24 @@ export default function AdminPanel() {
       });
     }
   };
+
+  if (authLoading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
+
+  if (!user || user.email !== "admin@enertech3.com") {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Acceso Denegado</h1>
+          <p>Debes estar autenticado como administrador para acceder a esta página.</p>
+          <p className="mt-4">
+            <a href="/login" className="text-blue-600 hover:underline">Ir al login</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
