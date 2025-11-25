@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -142,5 +142,24 @@ export default function ResetPasswordPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-transparent">
+        <Card className="mx-auto max-w-sm w-full">
+          <CardHeader className="space-y-4">
+            <div className="flex justify-center">
+              <Logo />
+            </div>
+            <CardTitle className="text-2xl text-center">Loading...</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
