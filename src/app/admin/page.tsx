@@ -114,9 +114,7 @@ export default function AdminPanel() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Acceso Denegado</h1>
           <p>Debes estar autenticado como administrador para acceder a esta página.</p>
-          <p className="mt-4">
-            <a href="/login" className="text-blue-600 hover:underline">Ir al login</a>
-          </p>
+          {user && <p className="mt-2">Usuario actual: {user.email}</p>}
         </div>
       </div>
     );
