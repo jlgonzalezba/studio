@@ -982,53 +982,45 @@ export default function MultifingerCaliperPage() {
       formData.append("file", file);
 
       try {
-        setUploadProgress(5); // Show progress bar immediately
-
-        // Usar XMLHttpRequest para rastrear progreso real de subida
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 100;
-            setUploadProgress(Math.round(percentComplete));
+        // Simular progreso de subida
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+          progress += Math.random() * 10 + 5; // Incremento aleatorio
+          if (progress >= 90) {
+            progress = 90;
+            clearInterval(progressInterval);
           }
+          setUploadProgress(Math.round(progress));
+        }, 300);
+
+        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
+          method: "POST",
+          body: formData,
         });
 
-        xhr.addEventListener('load', async () => {
-          if (xhr.status === 200) {
-            setUploadProgress(100);
-            const data = JSON.parse(xhr.responseText);
-            console.log("Respuesta del backend:", data);
+        clearInterval(progressInterval);
+        setUploadProgress(100);
 
-            if (data.detail && data.detail.startsWith("ERROR:")) {
-              throw new Error(data.detail.replace("ERROR: ", ""));
-            }
+        const data = await response.json();
+        console.log("Respuesta del backend:", data);
 
-            // Count number of fingers (R curves)
-            const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-            const numFingers = rCurves.length;
-
-            updateState({
-              fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
-              fileLoaded: true,
-              isProcessed: false,
-              isLoading: false
-            });
-          } else {
-            const errorData = JSON.parse(xhr.responseText);
-            if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
-              throw new Error(errorData.detail.replace("ERROR: ", ""));
-            }
-            throw new Error("Error al procesar el archivo en el backend.");
+        if (!response.ok) {
+          if (data.detail && data.detail.startsWith("ERROR:")) {
+            throw new Error(data.detail.replace("ERROR: ", ""));
           }
-        });
+          throw new Error("Error al procesar el archivo en el backend.");
+        }
 
-        xhr.addEventListener('error', () => {
-          throw new Error("Could not connect to the backend or process the file. Make sure the Python server is running.");
-        });
+        // Count number of fingers (R curves)
+        const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+        const numFingers = rCurves.length;
 
-        xhr.open('POST', 'https://studio-2lx4.onrender.com/api/multifinger-caliper/upload');
-        xhr.send(formData);
+        updateState({
+          fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+          fileLoaded: true,
+          isProcessed: false,
+          isLoading: false
+        });
 
       } catch (err: any) {
         console.error(err);
@@ -1046,25 +1038,22 @@ export default function MultifingerCaliperPage() {
     const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
       console.log("Procesando datos del caliper...");
       updateState({ isProcessing: true, error: null });
-      setProcessProgress(5); // Show progress bar immediately
+      setProcessProgress(0);
 
      try {
        // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
        const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-       // Iniciar polling del progreso
-       const progressInterval = setInterval(async () => {
-         try {
-           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
-           const progressData = await progressResponse.json();
-           setProcessProgress(progressData.progress);
-           if (progressData.progress >= 100) {
-             clearInterval(progressInterval);
-           }
-         } catch (e) {
-           console.error("Error fetching progress:", e);
+       // Simular progreso de procesamiento
+       let progress = 0;
+       const progressInterval = setInterval(() => {
+         progress += Math.random() * 15 + 5; // Incremento aleatorio
+         if (progress >= 95) {
+           progress = 95;
+           clearInterval(progressInterval);
          }
-       }, 500);
+         setProcessProgress(Math.round(progress));
+       }, 400);
 
        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
          method: "POST",
@@ -1074,7 +1063,6 @@ export default function MultifingerCaliperPage() {
          body: JSON.stringify({ use_centralized: useCentralized }),
        });
 
-       // Limpiar el intervalo y asegurar 100%
        clearInterval(progressInterval);
        setProcessProgress(100);
 
