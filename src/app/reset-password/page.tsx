@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,20 +145,24 @@ function ResetPasswordContent() {
   );
 }
 
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-transparent">
+      <Card className="mx-auto max-w-sm w-full">
+        <CardHeader className="space-y-4">
+          <div className="flex justify-center">
+            <Logo />
+          </div>
+          <CardTitle className="text-2xl text-center">Loading...</CardTitle>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+}
+
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen bg-transparent">
-        <Card className="mx-auto max-w-sm w-full">
-          <CardHeader className="space-y-4">
-            <div className="flex justify-center">
-              <Logo />
-            </div>
-            <CardTitle className="text-2xl text-center">Loading...</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-    }>
+    <Suspense fallback={<LoadingFallback />}>
       <ResetPasswordContent />
     </Suspense>
   );
