@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import re
+import time
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 
@@ -377,6 +378,7 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
     # Importar y actualizar progreso
     from .routes import processing_progress
 
+    start_time = time.time()
     processing_progress = 10
 
     # Obtener el CSV más reciente (centralizado u original según el parámetro)
@@ -385,7 +387,8 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
     if df is None:
         return {"error": "No se pudo cargar el archivo CSV más reciente"}
 
-    processing_progress = 20
+    elapsed = time.time() - start_time
+    processing_progress = min(100, max(20, (elapsed / 4.0) * 100))  # Estimate 4 seconds total
 
     # Detectar curvas R
     r_curves_info = detect_r_curves(df)
@@ -398,7 +401,8 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
             "available_columns": list(df.columns)
         }
 
-    processing_progress = 30
+    elapsed = time.time() - start_time
+    processing_progress = min(100, max(30, (elapsed / 4.0) * 100))
 
     # Calcular estadísticas
     stats_result = calculate_caliper_statistics(df, r_curves_info)
@@ -410,13 +414,15 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
             "r_curves_info": r_curves_info
         }
 
-    processing_progress = 50
+    elapsed = time.time() - start_time
+    processing_progress = min(100, max(50, (elapsed / 4.0) * 100))
 
     # Extraer datos crudos de profundidad y R
     raw_data = extract_depth_and_r_values(df)
     print(f"[DEBUG] Raw data extracted: depth_points={raw_data.get('total_points', 0)}, r_curves={len(raw_data.get('r_curves', []))}")
 
-    processing_progress = 70
+    elapsed = time.time() - start_time
+    processing_progress = min(100, max(70, (elapsed / 4.0) * 100))
 
     # Importar y calcular collars data - ejecutar joints.py si es necesario
     try:
@@ -458,7 +464,8 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
             except Exception as e:
                 print(f"[WARNING] Could not execute statistics.py: {e}")
 
-        processing_progress = 90
+        elapsed = time.time() - start_time
+        processing_progress = min(100, max(90, (elapsed / 4.0) * 100))
 
         if os.path.exists(collars_path):
             collars_df = pd.read_csv(collars_path)
