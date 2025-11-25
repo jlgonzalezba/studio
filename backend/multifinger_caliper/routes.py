@@ -5,6 +5,7 @@ Handles LAS file processing and analysis for multifinger caliper applications.
 
 import io
 import lasio
+import gzip
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
@@ -36,6 +37,10 @@ async def upload_and_process_las(file: UploadFile = File(...)):
     try:
         # Lee el contenido del archivo subido en memoria
         contents = await file.read()
+
+        # Descomprimir si es .gz
+        if file.filename.endswith('.gz'):
+            contents = gzip.decompress(contents)
 
         # Decodifica el contenido (mismo código que antes)
         decoded_content = None

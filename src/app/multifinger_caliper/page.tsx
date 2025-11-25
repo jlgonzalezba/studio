@@ -996,6 +996,7 @@ export default function MultifingerCaliperPage() {
         const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
           method: "POST",
           body: formData,
+          signal: AbortSignal.timeout(300000), // 5 minutes timeout
         });
 
         clearInterval(progressInterval);
@@ -1061,6 +1062,7 @@ export default function MultifingerCaliperPage() {
            "Content-Type": "application/json",
          },
          body: JSON.stringify({ use_centralized: useCentralized }),
+         signal: AbortSignal.timeout(300000), // 5 minutes timeout
        });
 
        clearInterval(progressInterval);
@@ -1135,7 +1137,7 @@ export default function MultifingerCaliperPage() {
               ref={fileInputRef}
               onChange={handleFileChange}
               className="hidden"
-              accept=".las" // Filtra para mostrar solo archivos .las
+              accept=".las,.gz" // Filtra para mostrar archivos .las y .gz
             />
             {/* Botón personalizado que activa el input oculto */}
             <div className="flex flex-col items-center space-y-4">
