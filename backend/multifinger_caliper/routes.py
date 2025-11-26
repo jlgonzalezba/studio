@@ -111,19 +111,24 @@ async def process_caliper(request: ProcessCaliperRequest):
     Args:
         request: ProcessCaliperRequest con el parámetro use_centralized
     """
+    print(f"[PROCESS] Starting process_caliper with use_centralized={request.use_centralized}")
     global processing_progress
     processing_progress = 0
 
     try:
         result = process_caliper_data(request.use_centralized)
+        print("[PROCESS] process_caliper_data completed")
 
         if "error" in result:
+            print(f"[PROCESS] Error in result: {result['error']}")
             raise HTTPException(status_code=400, detail=f"ERROR: {result['error']}")
 
         processing_progress = 100
+        print("[PROCESS] Process completed successfully")
         return result
 
     except Exception as e:
+        print(f"[PROCESS] Exception: {e}")
         error_msg = str(e)
         raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar datos del caliper - {error_msg}")
 

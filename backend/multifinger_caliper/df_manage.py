@@ -438,31 +438,35 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
         # Forzar regeneración de collars si el archivo actual es diferente al último procesado
         # Esto asegura que los collars se regeneren para cada pozo diferente
         if not os.path.exists(collars_path) or collars_mtime < csv_mtime:
-            print(f"[INFO] Generating collars for {filename}...")
+            print(f"[PROCESS] Generating collars for {filename}...")
             # Ejecutar la lógica de joints.py directamente
             import subprocess
             import sys
             try:
+                print("[PROCESS] Running joints.py")
                 # Ejecutar joints.py como script separado
                 result = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "joints.py")],
                                       capture_output=True, text=True, cwd=os.path.dirname(__file__))
                 if result.returncode == 0:
-                    print(f"[INFO] Collars generated successfully for {filename}")
+                    print(f"[PROCESS] Collars generated successfully for {filename}")
                 else:
-                    print(f"[WARNING] Error generating collars: {result.stderr}")
+                    print(f"[PROCESS] Error generating collars: returncode={result.returncode}, stderr={result.stderr}")
             except Exception as e:
-                print(f"[WARNING] Could not execute joints.py: {e}")
+                print(f"[PROCESS] Could not execute joints.py: {e}")
 
             # Ejecutar statistics.py después de joints.py
             try:
+                print("[PROCESS] Running statistics.py")
                 result_stats = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "statistics.py")],
                                               capture_output=True, text=True, cwd=os.path.dirname(__file__))
                 if result_stats.returncode == 0:
-                    print(f"[INFO] Statistics generated successfully for {filename}")
+                    print(f"[PROCESS] Statistics generated successfully for {filename}")
                 else:
-                    print(f"[WARNING] Error generating statistics: {result_stats.stderr}")
+                    print(f"[PROCESS] Error generating statistics: returncode={result_stats.returncode}, stderr={result_stats.stderr}")
             except Exception as e:
-                print(f"[WARNING] Could not execute statistics.py: {e}")
+                print(f"[PROCESS] Could not execute statistics.py: {e}")
+        else:
+            print(f"[PROCESS] Collars already exist for {filename}")
 
         elapsed = time.time() - start_time
         processing_progress = min(100, max(90, (elapsed / 4.0) * 100))
