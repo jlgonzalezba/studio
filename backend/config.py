@@ -29,3 +29,10 @@ API_VERSION = "v1"
 # File Upload Configuration
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 ALLOWED_EXTENSIONS = [".las", ".csv", ".txt"]
+
+# Cloudflare R2 Configuration
+R2_ACCESS_KEY_ID = "your_r2_access_key_id"
+R2_SECRET_ACCESS_KEY = "your_r2_secret_access_key"
+R2_ACCOUNT_ID = "your_account_id"
+R2_BUCKET_NAME = "your_bucket_name"
+R2_ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

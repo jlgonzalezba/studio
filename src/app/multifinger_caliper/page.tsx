@@ -896,6 +896,7 @@ export default function MultifingerCaliperPage() {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [processProgress, setProcessProgress] = useState(0);
+    const [currentFileKey, setCurrentFileKey] = useState<string | null>(null);
 
     const {
         isLoading,
@@ -964,79 +965,76 @@ export default function MultifingerCaliperPage() {
     const file = event.target.files?.[0];
     if (file) {
       console.log("Archivo seleccionado:", file.name);
-      // Aquí es donde manejarías la lógica para leer o subir el archivo.
       updateState({
         isLoading: true,
         fileInfo: null,
         error: null,
-        plotData: null, // Reset plot data when loading new file
-        useCustomScale: false, // Reset custom scale when loading new file
-        customMinDiam: 4, // Reset to default values
+        plotData: null,
+        useCustomScale: false,
+        customMinDiam: 4,
         customMaxDiam: 10,
-        isUncentralised: false, // Reset Desentralised toggle when loading new file
-        showCollars: false // Reset Show Collars checkbox when loading new file
+        isUncentralised: false,
+        showCollars: false
       });
-      setUploadProgress(0);
-
-      const formData = new FormData();
-      formData.append("file", file);
+      setUploadProgress(10);
 
       try {
-        // Simular progreso de subida
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-          progress += Math.random() * 10 + 5; // Incremento aleatorio
-          if (progress >= 90) {
-            progress = 90;
-            clearInterval(progressInterval);
-          }
-          setUploadProgress(Math.round(progress));
-        }, 300);
-
-        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
-          method: "POST",
-          body: formData,
-          signal: AbortSignal.timeout(300000), // 5 minutes timeout
+        // Get presigned URL
+        const presignedResponse = await fetch('https://studio-2lx4.onrender.com/api/multifinger-caliper/generate-presigned-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name }),
+          signal: AbortSignal.timeout(300000),
         });
 
-        clearInterval(progressInterval);
-        setUploadProgress(100);
-
-        const data = await response.json();
-        console.log("Respuesta del backend:", data);
-
-        if (!response.ok) {
-          if (data.detail && data.detail.startsWith("ERROR:")) {
-            throw new Error(data.detail.replace("ERROR: ", ""));
-          }
-          throw new Error("Error al procesar el archivo en el backend.");
+        if (!presignedResponse.ok) {
+          throw new Error("Error obteniendo URL de subida");
         }
 
-        // Count number of fingers (R curves)
-        const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-        const numFingers = rCurves.length;
+        const { presigned_url, file_key } = await presignedResponse.json();
+        setCurrentFileKey(file_key);
+
+        // Upload to R2
+        setUploadProgress(50);
+        const uploadResponse = await fetch(presigned_url, {
+          method: 'PUT',
+          body: file,
+          signal: AbortSignal.timeout(300000),
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error("Error subiendo archivo a R2");
+        }
+
+        setUploadProgress(100);
 
         updateState({
-          fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+          fileInfo: `Archivo subido: ${file.name}. Listo para procesar.`,
           fileLoaded: true,
           isProcessed: false,
           isLoading: false
         });
 
+        console.log("Archivo subido exitosamente a R2");
+
       } catch (err: any) {
         console.error(err);
         updateState({
-          error: "Could not connect to the backend or process the file. Make sure the Python server is running.",
-          fileLoaded: false
+          error: "Error al subir el archivo. Verifica la conexión.",
+          fileLoaded: false,
+          isLoading: false
         });
-      } finally {
-        updateState({ isLoading: false });
       }
     }
   };
 
   // Función para manejar el botón "Process Data"
     const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
+      if (!currentFileKey) {
+        updateState({ error: "No file uploaded" });
+        return;
+      }
+
       console.log("Procesando datos del caliper...");
       updateState({ isProcessing: true, error: null });
       setProcessProgress(0);
@@ -1056,12 +1054,12 @@ export default function MultifingerCaliperPage() {
          setProcessProgress(Math.round(progress));
        }, 400);
 
-       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
+       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-uploaded-file", {
          method: "POST",
          headers: {
            "Content-Type": "application/json",
          },
-         body: JSON.stringify({ use_centralized: useCentralized }),
+         body: JSON.stringify({ file_key: currentFileKey, use_centralized: useCentralized }),
          signal: AbortSignal.timeout(300000), // 5 minutes timeout
        });
 
@@ -1070,19 +1068,6 @@ export default function MultifingerCaliperPage() {
 
       const data = await response.json();
       console.log("Respuesta del procesamiento:", data);
-      console.log("Full backend data:", JSON.stringify(data, null, 2));
-      console.log("Data structure:", {
-        hasPlotData: !!data.plot_data,
-        plotDataKeys: data.plot_data ? Object.keys(data.plot_data) : [],
-        depthLength: data.plot_data?.depth?.length,
-        minDiameterLength: data.plot_data?.min_diameter?.length,
-        maxDiameterLength: data.plot_data?.max_diameter?.length,
-        avgDiameterLength: data.plot_data?.avg_diameter?.length,
-        hasRawData: !!data.raw_data,
-        rawDataKeys: data.raw_data ? Object.keys(data.raw_data) : [],
-        rawDepthLength: data.raw_data?.depth?.length,
-        rawCurves: data.raw_data?.r_curves?.length
-      });
 
       if (!response.ok) {
         if (data.detail && data.detail.startsWith("ERROR:")) {
