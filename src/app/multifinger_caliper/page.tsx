@@ -896,7 +896,6 @@ export default function MultifingerCaliperPage() {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [processProgress, setProcessProgress] = useState(0);
-    const [currentFileKey, setCurrentFileKey] = useState<string | null>(null);
 
     const {
         isLoading,
@@ -920,7 +919,7 @@ export default function MultifingerCaliperPage() {
         setState(prev => ({ ...prev, ...updates }));
     };
 
-   // Ref para el input de archivo oculto
+    // Ref para el input de archivo oculto
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Función para manejar el cambio del toggle
@@ -954,87 +953,90 @@ export default function MultifingerCaliperPage() {
          setShowConfirmDialog(false);
      };
 
-  // Función que se ejecuta al hacer clic en el botón "Load .LAS"
-  const handleButtonClick = () => {
-    // Simula un clic en el input de archivo
-    fileInputRef.current?.click();
-  };
+   // Función que se ejecuta al hacer clic en el botón "Load .LAS"
+   const handleButtonClick = () => {
+     // Simula un clic en el input de archivo
+     fileInputRef.current?.click();
+   };
 
-  // Función que se ejecuta cuando el usuario selecciona un archivo
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log("Archivo seleccionado:", file.name);
-      updateState({
-        isLoading: true,
-        fileInfo: null,
-        error: null,
-        plotData: null,
-        useCustomScale: false,
-        customMinDiam: 4,
-        customMaxDiam: 10,
-        isUncentralised: false,
-        showCollars: false
-      });
-      setUploadProgress(10);
+   // Función que se ejecuta cuando el usuario selecciona un archivo
+   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+     const file = event.target.files?.[0];
+     if (file) {
+       console.log("Archivo seleccionado:", file.name);
+       // Aquí es donde manejarías la lógica para leer o subir el archivo.
+       updateState({
+         isLoading: true,
+         fileInfo: null,
+         error: null,
+         plotData: null, // Reset plot data when loading new file
+         useCustomScale: false, // Reset custom scale when loading new file
+         customMinDiam: 4, // Reset to default values
+         customMaxDiam: 10,
+         isUncentralised: false, // Reset Desentralised toggle when loading new file
+         showCollars: false // Reset Show Collars checkbox when loading new file
+       });
+       setUploadProgress(0);
 
-      try {
-        // Get presigned URL
-        const presignedResponse = await fetch('https://studio-2lx4.onrender.com/api/multifinger-caliper/generate-presigned-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: file.name }),
-          signal: AbortSignal.timeout(300000),
-        });
+       const formData = new FormData();
+       formData.append("file", file);
 
-        if (!presignedResponse.ok) {
-          throw new Error("Error obteniendo URL de subida");
-        }
+       try {
+         // Simular progreso de subida
+         let progress = 0;
+         const progressInterval = setInterval(() => {
+           progress += Math.random() * 10 + 5; // Incremento aleatorio
+           if (progress >= 90) {
+             progress = 90;
+             clearInterval(progressInterval);
+           }
+           setUploadProgress(Math.round(progress));
+         }, 300);
 
-        const { presigned_url, file_key } = await presignedResponse.json();
-        setCurrentFileKey(file_key);
+         const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
+           method: "POST",
+           body: formData,
+           signal: AbortSignal.timeout(300000), // 5 minutes timeout
+         });
 
-        // Upload to R2
-        setUploadProgress(50);
-        const uploadResponse = await fetch(presigned_url, {
-          method: 'PUT',
-          body: file,
-          signal: AbortSignal.timeout(300000),
-        });
+         clearInterval(progressInterval);
+         setUploadProgress(100);
 
-        if (!uploadResponse.ok) {
-          throw new Error("Error subiendo archivo a R2");
-        }
+         const data = await response.json();
+         console.log("Respuesta del backend:", data);
 
-        setUploadProgress(100);
+         if (!response.ok) {
+           if (data.detail && data.detail.startsWith("ERROR:")) {
+             throw new Error(data.detail.replace("ERROR: ", ""));
+           }
+           throw new Error("Error al procesar el archivo en el backend.");
+         }
 
-        updateState({
-          fileInfo: `Archivo subido: ${file.name}. Listo para procesar.`,
-          fileLoaded: true,
-          isProcessed: false,
-          isLoading: false
-        });
+         // Count number of fingers (R curves)
+         const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+         const numFingers = rCurves.length;
 
-        console.log("Archivo subido exitosamente a R2");
+         updateState({
+           fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+           fileLoaded: true,
+           isProcessed: false,
+           isLoading: false
+         });
 
-      } catch (err: any) {
-        console.error(err);
-        updateState({
-          error: "Error al subir el archivo. Verifica la conexión.",
-          fileLoaded: false,
-          isLoading: false
-        });
-      }
-    }
-  };
+       } catch (err: any) {
+         console.error(err);
+         updateState({
+           error: "Could not connect to the backend or process the file. Make sure the Python server is running.",
+           fileLoaded: false
+         });
+       } finally {
+         updateState({ isLoading: false });
+       }
+     }
+   };
 
-  // Función para manejar el botón "Process Data"
+   // Función para manejar el botón "Process Data"
     const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
-      if (!currentFileKey) {
-        updateState({ error: "No file uploaded" });
-        return;
-      }
-
       console.log("Procesando datos del caliper...");
       updateState({ isProcessing: true, error: null });
       setProcessProgress(0);
@@ -1051,15 +1053,15 @@ export default function MultifingerCaliperPage() {
            progress = 95;
            clearInterval(progressInterval);
          }
-         setProcessProgress(Math.round(progress));
-       }, 400);
+Progress(Math.round(progress));
+        }, 400);
 
-       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-uploaded-file", {
+       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
          method: "POST",
          headers: {
            "Content-Type": "application/json",
          },
-         body: JSON.stringify({ file_key: currentFileKey, use_centralized: useCentralized }),
+         body: JSON.stringify({ use_centralized: useCentralized }),
          signal: AbortSignal.timeout(300000), // 5 minutes timeout
        });
 
@@ -1068,6 +1070,19 @@ export default function MultifingerCaliperPage() {
 
       const data = await response.json();
       console.log("Respuesta del procesamiento:", data);
+      console.log("Full backend data:", JSON.stringify(data, null, 2));
+      console.log("Data structure:", {
+        hasPlotData: !!data.plot_data,
+        plotDataKeys: data.plot_data ? Object.keys(data.plot_data) : [],
+        depthLength: data.plot_data?.depth?.length,
+        minDiameterLength: data.plot_data?.min_diameter?.length,
+        maxDiameterLength: data.plot_data?.max_diameter?.length,
+        avgDiameterLength: data.plot_data?.avg_diameter?.length,
+        hasRawData: !!data.raw_data,
+        rawDataKeys: data.raw_data ? Object.keys(data.raw_data) : [],
+        rawDepthLength: data.raw_data?.depth?.length,
+        rawCurves: data.raw_data?.r_curves?.length
+      });
 
       if (!response.ok) {
         if (data.detail && data.detail.startsWith("ERROR:")) {
@@ -1311,3 +1326,4 @@ export default function MultifingerCaliperPage() {
     </div>
   );
 }
+         setProcess
