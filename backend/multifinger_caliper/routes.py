@@ -21,15 +21,18 @@ from .df_manage import process_caliper_data
 # Create router for multifinger caliper endpoints
 router = APIRouter(prefix="/api/multifinger-caliper", tags=["multifinger-caliper"])
 
+# Global progress variable for processing
+processing_progress = 0
+
 
 @router.post("/upload")
 async def upload_and_process_las(file: UploadFile = File(...)):
     """
-    Endpoint para recibir un archivo .las o .gz, procesarlo con lasio y
+    Endpoint para recibir un archivo .las, procesarlo con lasio y
     devolver información específica para multifinger caliper.
     """
-    if not file.filename.endswith(('.las', '.gz')):
-        raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las o .gz")
+    if not file.filename.endswith('.las'):
+        raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las")
 
     try:
         print(f"[UPLOAD] Received file: {file.filename}")
@@ -43,7 +46,7 @@ async def upload_and_process_las(file: UploadFile = File(...)):
             contents = gzip.decompress(contents)
             print(f"[UPLOAD] Decompressed size: {len(contents)} bytes")
 
-        # Decodifica el contenido
+        # Decodifica el contenido (mismo código que antes)
         decoded_content = None
         encodings_to_try = ['utf-8', 'iso-8859-1', 'latin1', 'cp1252']
 
@@ -57,9 +60,14 @@ async def upload_and_process_las(file: UploadFile = File(...)):
         if decoded_content is None:
             raise UnicodeDecodeError("No se pudo decodificar el archivo")
 
+        # Crea el objeto LAS
+        file_like_object = io.StringIO(decoded_content)
+        las = lasio.read(file_like_object)
+
         print("[UPLOAD] Processing LAS data")
         # Procesa con la función mínima
         result = process_las_data(las)
+        print("[UPLOAD] LAS data processed successfully")
 
         # Exportar curvas a CSV automáticamente (original y centralizado)
         try:
@@ -83,6 +91,7 @@ async def upload_and_process_las(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail=f"ERROR: Formato LAS inválido - {str(e)}")
         raise HTTPException(status_code=400, detail=f"ERROR: Datos inválidos en el archivo - {str(e)}")
     except Exception as e:
+        # Si algo sale mal durante el procesamiento, devuelve un error
         print(f"[UPLOAD] General error: {e}")
         error_msg = str(e)
         if "No curves" in error_msg or "empty" in error_msg.lower():
@@ -123,6 +132,13 @@ async def process_caliper(request: ProcessCaliperRequest):
         error_msg = str(e)
         raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar datos del caliper - {error_msg}")
 
+
+@router.get("/progress")
+async def get_progress():
+    """
+    Get current processing progress.
+    """
+    return {"progress": processing_progress}
 
 @router.get("/health")
 async def health_check():
