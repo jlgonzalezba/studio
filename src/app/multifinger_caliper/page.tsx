@@ -1060,7 +1060,7 @@ export default function MultifingerCaliperPage() {
         // Configurar la petición para subir a R2
         xhr.open("PUT", uploadData.upload_url);
         xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        xhr.timeout = 1800000; // 30 minutes
+        xhr.timeout = 900000; // 15 minutes
         xhr.send(file);
 
       } catch (err: any) {
@@ -1097,8 +1097,8 @@ export default function MultifingerCaliperPage() {
         throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al iniciar procesamiento");
       }
 
-      // Hacer polling al progreso mientras se procesa
-      const pollProgress = async () => {
+      // Hacer polling al progreso mientras se procesa usando setInterval
+      const pollInterval = setInterval(async () => {
         try {
           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
           if (progressResponse.ok) {
@@ -1106,20 +1106,18 @@ export default function MultifingerCaliperPage() {
             setProcessProgress(progressData.progress);
 
             if (progressData.progress >= 100) {
-              // Procesamiento completo - marcar como listo
+              // Procesamiento completo - obtener resultados y marcar como listo
               console.log("Procesamiento completado exitosamente");
+              clearInterval(pollInterval); // Detener polling
+              await getProcessingResultsForData();
               updateState({
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
-                fileLoaded: true,
-                isProcessed: false,
                 isLoading: false,
                 uploadStatusMessage: null
               });
-            } else if (progressData.progress >= 0) {
-              // Continuar polling si está en progreso
-              setTimeout(pollProgress, 1000); // Poll every second
-            } else {
+            } else if (progressData.progress < 0) {
               // Error en procesamiento
+              clearInterval(pollInterval); // Detener polling
               updateState({
                 error: "Error durante el procesamiento del archivo",
                 fileLoaded: false,
@@ -1128,6 +1126,7 @@ export default function MultifingerCaliperPage() {
             }
           } else {
             // Error al consultar progreso
+            clearInterval(pollInterval); // Detener polling
             updateState({
               error: "Error al consultar el progreso del procesamiento",
               fileLoaded: false,
@@ -1136,16 +1135,14 @@ export default function MultifingerCaliperPage() {
           }
         } catch (err) {
           console.error("Error polling progress:", err);
+          clearInterval(pollInterval); // Detener polling
           updateState({
             error: "Error de conexión al consultar progreso",
             fileLoaded: false,
             isLoading: false
           });
         }
-      };
-
-      // Iniciar polling
-      setTimeout(pollProgress, 1000);
+      }, 1000); // Poll every second
 
     } catch (err: any) {
       console.error("Error starting processing:", err);
@@ -1174,7 +1171,7 @@ export default function MultifingerCaliperPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ use_centralized: useCentralized }),
-        signal: AbortSignal.timeout(1800000), // 30 minutes timeout
+        signal: AbortSignal.timeout(900000), // 15 minutes timeout
       });
 
       if (!response.ok) {
