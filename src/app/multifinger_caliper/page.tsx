@@ -996,9 +996,10 @@ export default function MultifingerCaliperPage() {
             setUploadProgress(100);
 
             // Mostrar mensaje de espera mientras el servidor procesa
+            console.log("Setting upload status message...");
             updateState({ uploadStatusMessage: "File uploaded, waiting for server response..." });
 
-            // Paso 2: Procesar archivo desde R2
+            // Paso 2: Procesar archivo desde R2 (el mensaje se mantiene durante todo el procesamiento)
             await processFileFromR2(uploadData.file_key);
 
           } catch (err: any) {
