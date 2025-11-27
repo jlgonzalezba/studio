@@ -1075,8 +1075,14 @@ export default function MultifingerCaliperPage() {
             setProcessProgress(progressData.progress);
 
             if (progressData.progress >= 100) {
-              // Procesamiento completo, obtener resultados
-              await getProcessingResults(fileKey);
+              // Procesamiento completo - marcar como listo
+              console.log("Procesamiento completado exitosamente");
+              updateState({
+                fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
+                fileLoaded: true,
+                isProcessed: false,
+                isLoading: false
+              });
             } else if (progressData.progress >= 0) {
               // Continuar polling si está en progreso
               setTimeout(pollProgress, 1000); // Poll every second
@@ -1119,40 +1125,6 @@ export default function MultifingerCaliperPage() {
     }
   };
 
-  // Función para obtener los resultados del procesamiento
-  const getProcessingResults = async (fileKey: string) => {
-    try {
-      console.log("Obteniendo resultados del procesamiento para file_key:", fileKey);
-
-      const resultsResponse = await fetch(`https://studio-2lx4.onrender.com/api/multifinger-caliper/processing-results/${fileKey}`);
-
-      if (!resultsResponse.ok) {
-        throw new Error("Resultados no disponibles aún");
-      }
-
-      const data = await resultsResponse.json();
-      console.log("Resultados obtenidos:", data);
-
-      // Count number of fingers (R curves)
-      const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-      const numFingers = rCurves.length;
-
-      updateState({
-        fileInfo: `File processed: ${fileKey}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
-        fileLoaded: true,
-        isProcessed: false,
-        isLoading: false
-      });
-
-    } catch (err: any) {
-      console.error("Error getting results:", err);
-      updateState({
-        error: "Error al obtener resultados del procesamiento",
-        fileLoaded: false,
-        isLoading: false
-      });
-    }
-  };
 
   // Función para manejar el botón "Process Data" con progreso real
   const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
