@@ -1067,15 +1067,21 @@ export default function MultifingerCaliperPage() {
       }
 
       // Hacer polling al progreso mientras se procesa
-      const pollProgress = async () => {
+      let pollAttempts = 0;
+      const maxAttempts = 300; // 5 minutes max (300 seconds)
+
+      const pollInterval = setInterval(async () => {
         try {
+          pollAttempts++;
           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
+
           if (progressResponse.ok) {
             const progressData = await progressResponse.json();
             setProcessProgress(progressData.progress);
 
             if (progressData.progress >= 100) {
               // Procesamiento completo - marcar como listo
+              clearInterval(pollInterval);
               console.log("Procesamiento completado exitosamente");
               updateState({
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
@@ -1083,19 +1089,19 @@ export default function MultifingerCaliperPage() {
                 isProcessed: false,
                 isLoading: false
               });
-            } else if (progressData.progress >= 0) {
-              // Continuar polling si está en progreso
-              setTimeout(pollProgress, 1000); // Poll every second
-            } else {
-              // Error en procesamiento
+            } else if (progressData.progress < 0 || pollAttempts >= maxAttempts) {
+              // Error en procesamiento o timeout
+              clearInterval(pollInterval);
               updateState({
-                error: "Error durante el procesamiento del archivo",
+                error: progressData.progress < 0 ? "Error durante el procesamiento del archivo" : "Timeout: procesamiento tomó demasiado tiempo",
                 fileLoaded: false,
                 isLoading: false
               });
             }
+            // Si progress >= 0 y < 100, continuar polling
           } else {
             // Error al consultar progreso
+            clearInterval(pollInterval);
             updateState({
               error: "Error al consultar el progreso del procesamiento",
               fileLoaded: false,
@@ -1104,16 +1110,14 @@ export default function MultifingerCaliperPage() {
           }
         } catch (err) {
           console.error("Error polling progress:", err);
+          clearInterval(pollInterval);
           updateState({
             error: "Error de conexión al consultar progreso",
             fileLoaded: false,
             isLoading: false
           });
         }
-      };
-
-      // Iniciar polling
-      setTimeout(pollProgress, 1000);
+      }, 1000); // Poll every second
 
     } catch (err: any) {
       console.error("Error starting processing:", err);
