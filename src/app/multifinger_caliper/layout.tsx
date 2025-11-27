@@ -19,6 +19,7 @@ interface MultifingerCaliperState {
   isUncentralised: boolean;
   showFingerReadings: boolean;
   showCollars: boolean;
+  currentFileKey: string | null;
 }
 
 // Create the context
@@ -44,6 +45,7 @@ const initialState: MultifingerCaliperState = {
   isUncentralised: false,
   showFingerReadings: false,
   showCollars: false,
+  currentFileKey: null,
 };
 
 // Context provider component

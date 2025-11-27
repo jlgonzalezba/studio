@@ -834,6 +834,7 @@ export default function MultifingerCaliperPage() {
         isUncentralised,
         showFingerReadings,
         showCollars,
+        currentFileKey,
         // uploadStatusMessage removed to prevent infinite re-renders
     } = state;
 
@@ -895,7 +896,9 @@ export default function MultifingerCaliperPage() {
         customMinDiam: 4, // Reset to default values
         customMaxDiam: 10,
         isUncentralised: false, // Reset Desentralised toggle when loading new file
-        showCollars: false // Reset Show Collars checkbox when loading new file
+        showCollars: false, // Reset Show Collars checkbox when loading new file
+        currentFileKey: null, // Reset file key when loading new file
+        isProcessed: false // Reset processed state when loading new file
       });
       setUploadProgress(0);
 
@@ -1025,7 +1028,8 @@ export default function MultifingerCaliperPage() {
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
                 fileLoaded: true,
                 isProcessed: true,
-                isLoading: false
+                isLoading: false,
+                currentFileKey: fileKey
               });
             } else if (progressData.progress < 0) {
               // Error en procesamiento
@@ -1073,16 +1077,73 @@ export default function MultifingerCaliperPage() {
      updateState({ isProcessing: true, error: null });
 
      try {
-       // Para reprocesar, necesitamos el file_key del archivo que se subió
-       // Por simplicidad, por ahora solo permitimos reprocesar con la configuración actual
+       // Verificar que tenemos un file_key para reprocesar
+       if (!currentFileKey) {
+         updateState({
+           error: "No hay archivo para reprocesar. Por favor, sube un archivo primero.",
+           isProcessing: false
+         });
+         return;
+       }
+
+       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
        const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-       // Como no tenemos el file_key guardado, por ahora mostramos un mensaje
-       // En una implementación completa, guardaríamos el file_key después de la subida
-       updateState({
-         error: "Reprocesamiento desde R2 requiere el file_key. Por favor, sube el archivo nuevamente.",
-         isProcessing: false
+       // Iniciar reprocesamiento desde R2
+       const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+         },
+         body: JSON.stringify({
+           file_key: currentFileKey,
+           use_centralized: useCentralized
+         }),
        });
+
+       if (!processResponse.ok) {
+         const errorData = await processResponse.json();
+         throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al iniciar reprocesamiento");
+       }
+
+       // Hacer polling hasta que termine el reprocesamiento
+       const pollInterval = setInterval(async () => {
+         try {
+           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
+           if (progressResponse.ok) {
+             const progressData = await progressResponse.json();
+             setProcessProgress(progressData.progress);
+
+             if (progressData.progress >= 100) {
+               // Reprocesamiento completo - obtener resultados
+               clearInterval(pollInterval);
+               await getProcessingResultsForData();
+               updateState({
+                 isProcessing: false
+               });
+             } else if (progressData.progress < 0) {
+               // Error en reprocesamiento
+               clearInterval(pollInterval);
+               updateState({
+                 error: "Error durante el reprocesamiento del archivo",
+                 isProcessing: false
+               });
+             }
+           } else {
+             clearInterval(pollInterval);
+             updateState({
+               error: "Error al consultar el progreso del reprocesamiento",
+               isProcessing: false
+             });
+           }
+         } catch (err) {
+           clearInterval(pollInterval);
+           updateState({
+             error: "Error de conexión durante el reprocesamiento",
+             isProcessing: false
+           });
+         }
+       }, 2000); // Poll every 2 seconds
 
      } catch (err: any) {
        console.error("Error al reprocesar datos:", err);
