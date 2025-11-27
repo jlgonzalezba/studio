@@ -19,7 +19,6 @@ interface MultifingerCaliperState {
   isUncentralised: boolean;
   showFingerReadings: boolean;
   showCollars: boolean;
-  uploadStatusMessage: string | null;
 }
 
 // Create the context
@@ -45,7 +44,6 @@ const initialState: MultifingerCaliperState = {
   isUncentralised: false,
   showFingerReadings: false,
   showCollars: false,
-  uploadStatusMessage: null,
 };
 
 // Context provider component

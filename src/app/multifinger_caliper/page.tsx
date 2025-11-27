@@ -913,7 +913,7 @@ export default function MultifingerCaliperPage() {
         isUncentralised,
         showFingerReadings,
         showCollars,
-        uploadStatusMessage
+        // uploadStatusMessage removed to prevent infinite re-renders
     } = state;
 
     const updateState = (updates: any) => {
@@ -1016,23 +1016,17 @@ export default function MultifingerCaliperPage() {
             console.log("Archivo subido exitosamente a R2");
             setUploadProgress(100);
 
-            // Mostrar mensaje de espera mientras el servidor procesa
-            console.log("Setting upload status message...");
-            updateState({ uploadStatusMessage: "File uploaded, waiting for server response..." });
-            console.log("Upload status message set to:", "File uploaded, waiting for server response...");
+            // El procesamiento comenzará automáticamente
 
             // Paso 3: Procesar archivo desde R2
-            console.log("About to call processFileFromR2 with file_key:", uploadData.file_key);
             await processFileFromR2(uploadData.file_key);
-            console.log("processFileFromR2 completed");
 
           } else {
             console.error("Error al subir a R2:", xhr.status, xhr.responseText);
             updateState({
               error: "Error al subir archivo a R2",
               fileLoaded: false,
-              isLoading: false,
-              uploadStatusMessage: null
+              isLoading: false
             });
           }
         };
@@ -1042,8 +1036,7 @@ export default function MultifingerCaliperPage() {
           updateState({
             error: "Error de conexión al subir el archivo",
             fileLoaded: false,
-            isLoading: false,
-            uploadStatusMessage: null
+            isLoading: false
           });
         };
 
@@ -1068,8 +1061,7 @@ export default function MultifingerCaliperPage() {
         updateState({
           error: err.message || "Error al procesar la subida del archivo",
           fileLoaded: false,
-          isLoading: false,
-          uploadStatusMessage: null
+          isLoading: false
         });
       }
     }
@@ -1077,9 +1069,9 @@ export default function MultifingerCaliperPage() {
 
   // Función para procesar archivo desde R2 con progreso real
   const processFileFromR2 = async (fileKey: string) => {
-    try {
-      console.log("Procesando archivo desde R2...");
+    let pollInterval: NodeJS.Timeout | null = null;
 
+    try {
       // Iniciar procesamiento
       const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
         method: "POST",
@@ -1098,7 +1090,7 @@ export default function MultifingerCaliperPage() {
       }
 
       // Hacer polling al progreso mientras se procesa usando setInterval
-      const pollInterval = setInterval(async () => {
+      pollInterval = setInterval(async () => {
         try {
           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
           if (progressResponse.ok) {
@@ -1107,17 +1099,15 @@ export default function MultifingerCaliperPage() {
 
             if (progressData.progress >= 100) {
               // Procesamiento completo - obtener resultados y marcar como listo
-              console.log("Procesamiento completado exitosamente");
-              clearInterval(pollInterval); // Detener polling
+              if (pollInterval) clearInterval(pollInterval);
               await getProcessingResultsForData();
               updateState({
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
-                isLoading: false,
-                uploadStatusMessage: null
+                isLoading: false
               });
             } else if (progressData.progress < 0) {
               // Error en procesamiento
-              clearInterval(pollInterval); // Detener polling
+              if (pollInterval) clearInterval(pollInterval);
               updateState({
                 error: "Error durante el procesamiento del archivo",
                 fileLoaded: false,
@@ -1126,7 +1116,7 @@ export default function MultifingerCaliperPage() {
             }
           } else {
             // Error al consultar progreso
-            clearInterval(pollInterval); // Detener polling
+            if (pollInterval) clearInterval(pollInterval);
             updateState({
               error: "Error al consultar el progreso del procesamiento",
               fileLoaded: false,
@@ -1134,18 +1124,17 @@ export default function MultifingerCaliperPage() {
             });
           }
         } catch (err) {
-          console.error("Error polling progress:", err);
-          clearInterval(pollInterval); // Detener polling
+          if (pollInterval) clearInterval(pollInterval);
           updateState({
             error: "Error de conexión al consultar progreso",
             fileLoaded: false,
             isLoading: false
           });
         }
-      }, 1000); // Poll every second
+      }, 2000); // Poll every 2 seconds to reduce load
 
     } catch (err: any) {
-      console.error("Error starting processing:", err);
+      if (pollInterval) clearInterval(pollInterval);
       updateState({
         error: err.message || "Error al procesar el archivo",
         fileLoaded: false,
@@ -1295,11 +1284,7 @@ export default function MultifingerCaliperPage() {
                     ></div>
                   </div>
                   <p className="text-sm text-gray-600 mt-2 text-center">
-                    {(() => {
-                      const message = uploadStatusMessage || `Uploading... ${uploadProgress}%`;
-                      console.log("Rendering message:", message);
-                      return message;
-                    })()}
+                    {uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : 'Processing file...'}
                   </p>
                 </div>
               )}
