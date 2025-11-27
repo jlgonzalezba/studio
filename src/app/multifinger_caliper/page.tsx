@@ -1021,9 +1021,10 @@ export default function MultifingerCaliperPage() {
             if (progressData.progress >= 100) {
               // Procesamiento completo - obtener resultados y marcar como listo
               if (pollInterval) clearInterval(pollInterval);
-              await getProcessingResultsForData();
               updateState({
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
+                fileLoaded: true,
+                isProcessed: true,
                 isLoading: false
               });
             } else if (progressData.progress < 0) {
@@ -1114,9 +1115,10 @@ export default function MultifingerCaliperPage() {
     try {
       console.log("Obteniendo resultados del procesamiento de datos");
 
-      // Para este caso, necesitamos hacer una llamada adicional para obtener los datos procesados
-      // Ya que el endpoint /process-caliper no devuelve los datos directamente con el polling
-      const useCentralized = !isUncentralised;
+      // Obtener el estado actual para determinar si usar centralized o no
+      const currentState = state;
+      const useCentralized = !currentState.isUncentralised;
+
       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
         method: "POST",
         headers: {
