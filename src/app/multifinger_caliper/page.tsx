@@ -573,7 +573,10 @@ const HTML5CanvasPlot = ({
     if (selection.start) {
       setSelection(prev => prev.start ? {start: prev.start, end: {x, y}} : prev);
       setTooltip(null);
-    } else if (data && data.plot_data) {
+    }
+    // Temporarily disabled tooltip and depth setting to prevent infinite re-renders
+    /*
+    else if (data && data.plot_data) {
       const visibleDepthMin = zoomState.minDepth ?? Math.min(...data.plot_data.depth);
       const visibleDepthMax = zoomState.maxDepth ?? Math.max(...data.plot_data.depth);
       const depth = visibleDepthMin + ((y - 15) / 535) * (visibleDepthMax - visibleDepthMin);
@@ -607,6 +610,7 @@ const HTML5CanvasPlot = ({
       setTooltip({show: true, x, y, depth: closest.d, min: minVal, max: maxVal, avg: avgVal, gr: grVal, temp: tempVal});
       setCurrentDepth(closest.d);
     }
+    */
   };
 
   const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -778,106 +782,23 @@ const HTML5CanvasPlot = ({
 };
 
 
-// Cross Section Plot Component
+// Cross Section Plot Component - Temporarily simplified to prevent infinite re-renders
 const CrossSectionPlot = ({ data, currentDepth }: { data: any, currentDepth: number | null }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!data || !data.raw_data || !currentDepth) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, 400, 400);
-
-    const depths = data.raw_data.depth;
-    const rCurves = data.raw_data.r_curves;
-
-    if (!depths || !Array.isArray(depths) || !rCurves || !Array.isArray(rCurves)) return;
-
-    let index = 0;
-    let minDiff = Math.abs(depths[0] - currentDepth);
-    for (let i = 1; i < depths.length; i++) {
-      const diff = Math.abs(depths[i] - currentDepth);
-      if (diff < minDiff) {
-        minDiff = diff;
-        index = i;
-      }
-    }
-
-    if (index >= rCurves.length) return;
-
-    const r = rCurves[index];
-    console.log('r:', r, 'num:', r ? r.length : 'undefined');
-    if (!r || !Array.isArray(r) || r.length === 0) {
-      ctx.fillStyle = 'black';
-      ctx.font = '16px Arial';
-      ctx.fillText('No cross-section data', 120, 200);
-      return;
-    }
-
-    const num = r.length;
-    const centerX = 200;
-    const centerY = 200;
-
-    const nominalCasingRadius = 3.5; // 7-inch diameter
-    const maxR = r.filter(val => val !== null).reduce((max, val) => Math.max(max, val), -Infinity);
-    if (maxR === 0) return;
-
-    // Determine the radius for scaling to ensure everything fits
-    const scaleRadius = Math.max(nominalCasingRadius, maxR);
-    const scale = 180 / scaleRadius; // fit within 180 pixels
-
-    // Draw fixed 7-inch casing circle
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, nominalCasingRadius * scale, 0, 2 * Math.PI);
-    ctx.stroke();
-
-    // Draw points and lines
-    ctx.strokeStyle = 'blue';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
-    const points: number[][] = [];
-    for (let i = 0; i < num; i++) {
-      const angle = (i / num) * 2 * Math.PI;
-      const x = centerX + r[i] * scale * Math.cos(angle);
-      const y = centerY + r[i] * scale * Math.sin(angle);
-      points.push([x, y]);
-    }
-
-    // Draw lines
-    for (let i = 0; i < points.length; i++) {
-      const [x, y] = points[i];
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.closePath();
-    ctx.stroke();
-
-    // Draw points
-    ctx.fillStyle = 'red';
-    for (const [x, y] of points) {
-      ctx.beginPath();
-      ctx.arc(x, y, 3, 0, 2 * Math.PI);
-      ctx.fill();
-    }
-
-  }, [data, currentDepth]);
-
-  return <canvas ref={canvasRef} width={400} height={400} style={{
+  return <div style={{
+    width: '400px',
+    height: '400px',
     border: '3px solid #2F4F4F',
     borderRadius: '12px',
     boxShadow: '0 8px 16px rgba(37, 99, 235, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1)',
-    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-  }} />;
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '16px',
+    color: '#666'
+  }}>
+    Cross Section (Disabled to prevent infinite re-renders)
+  </div>;
 };
 
 
