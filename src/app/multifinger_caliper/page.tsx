@@ -978,47 +978,29 @@ export default function MultifingerCaliperPage() {
       setUploadProgress(0);
 
       try {
-        // Paso 1: Obtener URL presigned para subir a R2
-        console.log("Obteniendo URL presigned...");
-        const uploadUrlResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/get-upload-url", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            filename: file.name,
-            content_type: file.type || "application/octet-stream"
-          }),
-          signal: AbortSignal.timeout(30000), // 30 seconds timeout
-        });
-
-        if (!uploadUrlResponse.ok) {
-          const errorData = await uploadUrlResponse.json();
-          throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al obtener URL de subida");
-        }
-
-        const uploadData = await uploadUrlResponse.json();
-        console.log("URL presigned obtenida:", uploadData);
-
-        // Paso 2: Subir archivo directamente a R2
-        console.log("Subiendo archivo a R2...");
+        // Paso 1: Subir archivo al backend (que lo sube a R2)
+        console.log("Subiendo archivo al backend...");
         setUploadProgress(10);
 
-        // Try without Content-Type header to avoid preflight CORS request
-        const uploadResponse = await fetch(uploadData.upload_url, {
-          method: "PUT",
-          body: file,
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const uploadResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-via-proxy", {
+          method: "POST",
+          body: formData,
           signal: AbortSignal.timeout(300000), // 5 minutes timeout
         });
 
         if (!uploadResponse.ok) {
-          throw new Error("Error al subir archivo a R2");
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al subir archivo");
         }
 
-        console.log("Archivo subido a R2 exitosamente");
+        const uploadData = await uploadResponse.json();
+        console.log("Archivo subido exitosamente:", uploadData);
         setUploadProgress(90);
 
-        // Paso 3: Procesar archivo desde R2
+        // Paso 2: Procesar archivo desde R2
         console.log("Procesando archivo desde R2...");
         const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
           method: "POST",

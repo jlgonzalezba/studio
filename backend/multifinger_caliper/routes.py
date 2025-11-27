@@ -91,6 +91,49 @@ async def get_upload_url(request: GetUploadUrlRequest):
         print(f"[GET-UPLOAD-URL] Error: {e}")
         raise HTTPException(status_code=500, detail=f"ERROR: Failed to generate upload URL - {str(e)}")
 
+@router.post("/upload-via-proxy")
+async def upload_via_proxy(file: UploadFile = File(...)):
+    """
+    Proxy endpoint: receives file from frontend and uploads it to R2.
+    Returns the file_key for later processing.
+    """
+    try:
+        # Validate file extension
+        if not file.filename or not any(file.filename.lower().endswith(ext) for ext in ['.las', '.gz']):
+            raise HTTPException(status_code=400, detail="ERROR: Only .las and .gz files are allowed")
+
+        # Generate unique file key
+        file_extension = '.las' if not file.filename.lower().endswith('.gz') else '.las.gz'
+        unique_id = str(uuid.uuid4())
+        file_key = f"uploads/{unique_id}_{file.filename}"
+
+        print(f"[UPLOAD-PROXY] Uploading file {file.filename} to R2 key: {file_key}")
+
+        # Upload file to R2
+        s3_client = get_r2_client()
+
+        # Read file in chunks to avoid memory issues
+        file_content = await file.read()
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"ERROR: File too large. Maximum size is {MAX_FILE_SIZE} bytes")
+
+        s3_client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=file_key,
+            Body=file_content,
+            ContentType=file.content_type or "application/octet-stream"
+        )
+
+        print(f"[UPLOAD-PROXY] Successfully uploaded {len(file_content)} bytes to R2")
+        return {
+            "file_key": file_key,
+            "message": "File uploaded successfully"
+        }
+
+    except Exception as e:
+        print(f"[UPLOAD-PROXY] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"ERROR: Failed to upload file - {str(e)}")
+
 @router.post("/process-from-r2")
 async def process_from_r2(request: ProcessFromR2Request):
     """
