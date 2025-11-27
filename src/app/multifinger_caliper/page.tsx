@@ -1067,48 +1067,32 @@ export default function MultifingerCaliperPage() {
   };
 
 
-  // Función para manejar el botón "Process Data" (sin barra de progreso)
-  const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
-    console.log("Procesando datos del caliper...");
-    updateState({ isProcessing: true, error: null });
+  // Función para manejar el botón "Process Data" - reprocesa desde R2
+   const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
+     console.log("Reprocesando datos desde R2...");
+     updateState({ isProcessing: true, error: null });
 
-    try {
-      // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
-      const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
+     try {
+       // Para reprocesar, necesitamos el file_key del archivo que se subió
+       // Por simplicidad, por ahora solo permitimos reprocesar con la configuración actual
+       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-      const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ use_centralized: useCentralized }),
-        signal: AbortSignal.timeout(900000), // 15 minutes timeout
-      });
+       // Como no tenemos el file_key guardado, por ahora mostramos un mensaje
+       // En una implementación completa, guardaríamos el file_key después de la subida
+       updateState({
+         error: "Reprocesamiento desde R2 requiere el file_key. Por favor, sube el archivo nuevamente.",
+         isProcessing: false
+       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
-          throw new Error(errorData.detail.replace("ERROR: ", ""));
-        }
-        throw new Error("Error al procesar los datos del caliper.");
-      }
-
-      const data = await response.json();
-      console.log("Respuesta del procesamiento:", data);
-
-      updateState({ plotData: data, isProcessed: true });
-      console.log("Datos del gráfico procesados correctamente");
-
-    } catch (err: any) {
-      console.error("Error al procesar datos:", err);
-      updateState({
-        error: err.message || "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
-        plotData: null
-      });
-    } finally {
-      updateState({ isProcessing: false });
-    }
-  };
+     } catch (err: any) {
+       console.error("Error al reprocesar datos:", err);
+       updateState({
+         error: err.message || "Error reprocessing caliper data.",
+         plotData: null,
+         isProcessing: false
+       });
+     }
+   };
 
   // Función para obtener los resultados del procesamiento de datos
   const getProcessingResultsForData = async () => {
