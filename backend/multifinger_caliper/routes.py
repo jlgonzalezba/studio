@@ -43,6 +43,9 @@ router = APIRouter(prefix="/api/multifinger-caliper", tags=["multifinger-caliper
 # Global progress variable for processing
 processing_progress = 0
 
+# Global storage for processing results (in production, use a database)
+processing_results = {}
+
 # Initialize R2 client
 def get_r2_client():
     return boto3.client(
@@ -137,17 +140,22 @@ async def upload_via_proxy(file: UploadFile = File(...)):
 @router.post("/process-from-r2")
 async def process_from_r2(request: ProcessFromR2Request):
     """
-    Download and process a file from Cloudflare R2.
+    Download and process a file from Cloudflare R2 with progress tracking.
     """
+    global processing_progress, processing_results
+
     try:
         print(f"[PROCESS-R2] Starting processing for file_key: {request.file_key}")
+        processing_progress = 0
 
         # Download file from R2
         s3_client = get_r2_client()
+        processing_progress = 10
         response = s3_client.get_object(Bucket=R2_BUCKET_NAME, Key=request.file_key)
         file_content = response['Body'].read()
 
         print(f"[PROCESS-R2] Downloaded file size: {len(file_content)} bytes")
+        processing_progress = 20
 
         # Validate file size
         if len(file_content) > MAX_FILE_SIZE:
@@ -158,6 +166,8 @@ async def process_from_r2(request: ProcessFromR2Request):
             print("[PROCESS-R2] Decompressing .gz file")
             file_content = gzip.decompress(file_content)
             print(f"[PROCESS-R2] Decompressed size: {len(file_content)} bytes")
+
+        processing_progress = 30
 
         # Decode content
         decoded_content = None
@@ -173,13 +183,18 @@ async def process_from_r2(request: ProcessFromR2Request):
         if decoded_content is None:
             raise UnicodeDecodeError("No se pudo decodificar el archivo")
 
+        processing_progress = 40
+
         # Process LAS file
         print("[PROCESS-R2] Processing LAS data")
         file_like_object = io.StringIO(decoded_content)
         las = lasio.read(file_like_object)
 
+        processing_progress = 60
         result = process_las_data(las)
         print("[PROCESS-R2] LAS data processed successfully")
+
+        processing_progress = 80
 
         # Export curves to CSV
         try:
@@ -191,19 +206,27 @@ async def process_from_r2(request: ProcessFromR2Request):
             print(f"[PROCESS-R2] CSV export error: {e}")
             result["csv_error"] = str(e)
 
+        processing_progress = 100
+
+        # Store results for later retrieval
+        processing_results[request.file_key] = result
+
         print("[PROCESS-R2] Processing completed successfully")
-        return result
+        return {"status": "completed", "file_key": request.file_key, "message": "Processing completed"}
 
     except UnicodeDecodeError as e:
         print(f"[PROCESS-R2] Unicode decode error: {e}")
+        processing_progress = -1  # Error state
         raise HTTPException(status_code=400, detail="ERROR: El archivo .las debe estar en formato UTF-8. Convierta el archivo a UTF-8 e intente nuevamente.")
     except ValueError as e:
         print(f"[PROCESS-R2] Value error: {e}")
+        processing_progress = -1
         if "LAS" in str(e):
             raise HTTPException(status_code=400, detail=f"ERROR: Formato LAS inválido - {str(e)}")
         raise HTTPException(status_code=400, detail=f"ERROR: Datos inválidos en el archivo - {str(e)}")
     except Exception as e:
         print(f"[PROCESS-R2] General error: {e}")
+        processing_progress = -1
         error_msg = str(e)
         if "No curves" in error_msg or "empty" in error_msg.lower():
             raise HTTPException(status_code=400, detail="ERROR: El archivo .las no contiene curvas válidas o está vacío.")
@@ -326,6 +349,18 @@ async def get_progress():
     Get current processing progress.
     """
     return {"progress": processing_progress}
+
+@router.get("/processing-results/{file_key}")
+async def get_processing_results(file_key: str):
+    """
+    Get processing results for a specific file key.
+    """
+    global processing_results
+
+    if file_key in processing_results:
+        return processing_results[file_key]
+    else:
+        raise HTTPException(status_code=404, detail="Processing results not found. Processing may not be complete yet.")
 
 @router.get("/health")
 async def health_check():

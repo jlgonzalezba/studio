@@ -960,7 +960,7 @@ export default function MultifingerCaliperPage() {
   };
 
   // Función que se ejecuta cuando el usuario selecciona un archivo
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       console.log("Archivo seleccionado:", file.name);
@@ -977,133 +977,216 @@ export default function MultifingerCaliperPage() {
       });
       setUploadProgress(0);
 
-      try {
-        // Paso 1: Subir archivo al backend (que lo sube a R2)
-        console.log("Subiendo archivo al backend...");
-        setUploadProgress(10);
+      // Usar XMLHttpRequest para tener progreso real de subida
+      const xhr = new XMLHttpRequest();
 
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const uploadResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-via-proxy", {
-          method: "POST",
-          body: formData,
-          signal: AbortSignal.timeout(900000), // 15 minutes timeout for large files
-        });
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al subir archivo");
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setUploadProgress(Math.round(percentComplete));
         }
+      };
 
-        const uploadData = await uploadResponse.json();
-        console.log("Archivo subido exitosamente:", uploadData);
-        setUploadProgress(90);
+      xhr.onload = async () => {
+        if (xhr.status === 200) {
+          try {
+            const uploadData = JSON.parse(xhr.responseText);
+            console.log("Archivo subido exitosamente:", uploadData);
+            setUploadProgress(100);
 
-        // Paso 2: Procesar archivo desde R2
-        console.log("Procesando archivo desde R2...");
-        const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            file_key: uploadData.file_key,
-            use_centralized: true
-          }),
-          signal: AbortSignal.timeout(900000), // 15 minutes timeout for processing
-        });
+            // Paso 2: Procesar archivo desde R2 con progreso real
+            await processFileFromR2(uploadData.file_key);
 
-        setUploadProgress(100);
-
-        const data = await processResponse.json();
-        console.log("Respuesta del procesamiento:", data);
-
-        if (!processResponse.ok) {
-          if (data.detail && data.detail.startsWith("ERROR:")) {
-            throw new Error(data.detail.replace("ERROR: ", ""));
+          } catch (err: any) {
+            console.error("Error parsing upload response:", err);
+            updateState({
+              error: "Error al procesar la respuesta del servidor",
+              fileLoaded: false,
+              isLoading: false
+            });
           }
-          throw new Error("Error al procesar el archivo desde R2.");
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al subir archivo");
+          } catch {
+            throw new Error("Error al subir archivo");
+          }
         }
+      };
 
-        // Count number of fingers (R curves)
-        const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-        const numFingers = rCurves.length;
-
+      xhr.onerror = () => {
+        console.error("Upload failed");
         updateState({
-          fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
-          fileLoaded: true,
-          isProcessed: false,
+          error: "Error de conexión al subir el archivo",
+          fileLoaded: false,
           isLoading: false
         });
+      };
 
-      } catch (err: any) {
-        console.error(err);
+      xhr.ontimeout = () => {
+        console.error("Upload timeout");
         updateState({
-          error: "Could not connect to the backend or process the file. Make sure the Python server is running.",
-          fileLoaded: false
+          error: "Timeout al subir el archivo (demasiado grande)",
+          fileLoaded: false,
+          isLoading: false
         });
-      } finally {
-        updateState({ isLoading: false });
-      }
+      };
+
+      // Configurar la petición
+      xhr.open("POST", "https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-via-proxy");
+      xhr.timeout = 900000; // 15 minutes
+
+      // Crear FormData y enviar
+      const formData = new FormData();
+      formData.append("file", file);
+      xhr.send(formData);
     }
   };
 
-  // Función para manejar el botón "Process Data"
-    const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
-      console.log("Procesando datos del caliper...");
-      updateState({ isProcessing: true, error: null });
-      setProcessProgress(0);
+  // Función para procesar archivo desde R2 con progreso real
+  const processFileFromR2 = async (fileKey: string) => {
+    try {
+      console.log("Procesando archivo desde R2...");
 
-     try {
-       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
-       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
+      // Iniciar procesamiento
+      const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          file_key: fileKey,
+          use_centralized: true
+        }),
+      });
 
-       // Simular progreso de procesamiento
-       let progress = 0;
-       const progressInterval = setInterval(() => {
-         progress += Math.random() * 15 + 5; // Incremento aleatorio
-         if (progress >= 95) {
-           progress = 95;
-           clearInterval(progressInterval);
-         }
-         setProcessProgress(Math.round(progress));
-       }, 400);
+      if (!processResponse.ok) {
+        const errorData = await processResponse.json();
+        throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al iniciar procesamiento");
+      }
 
-       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-         },
-         body: JSON.stringify({ use_centralized: useCentralized }),
-         signal: AbortSignal.timeout(300000), // 5 minutes timeout
-       });
+      // Hacer polling al progreso mientras se procesa
+      const pollProgress = async () => {
+        try {
+          const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
+          if (progressResponse.ok) {
+            const progressData = await progressResponse.json();
+            setProcessProgress(progressData.progress);
 
-       clearInterval(progressInterval);
-       setProcessProgress(100);
+            if (progressData.progress >= 100) {
+              // Procesamiento completo, obtener resultados
+              await getProcessingResults(fileKey);
+            } else if (progressData.progress >= 0) {
+              // Continuar polling si está en progreso
+              setTimeout(pollProgress, 1000); // Poll every second
+            } else {
+              // Error en procesamiento
+              updateState({
+                error: "Error durante el procesamiento del archivo",
+                fileLoaded: false,
+                isLoading: false
+              });
+            }
+          } else {
+            // Error al consultar progreso
+            updateState({
+              error: "Error al consultar el progreso del procesamiento",
+              fileLoaded: false,
+              isLoading: false
+            });
+          }
+        } catch (err) {
+          console.error("Error polling progress:", err);
+          updateState({
+            error: "Error de conexión al consultar progreso",
+            fileLoaded: false,
+            isLoading: false
+          });
+        }
+      };
 
-      const data = await response.json();
-      console.log("Respuesta del procesamiento:", data);
-      console.log("Full backend data:", JSON.stringify(data, null, 2));
-      console.log("Data structure:", {
-        hasPlotData: !!data.plot_data,
-        plotDataKeys: data.plot_data ? Object.keys(data.plot_data) : [],
-        depthLength: data.plot_data?.depth?.length,
-        minDiameterLength: data.plot_data?.min_diameter?.length,
-        maxDiameterLength: data.plot_data?.max_diameter?.length,
-        avgDiameterLength: data.plot_data?.avg_diameter?.length,
-        hasRawData: !!data.raw_data,
-        rawDataKeys: data.raw_data ? Object.keys(data.raw_data) : [],
-        rawDepthLength: data.raw_data?.depth?.length,
-        rawCurves: data.raw_data?.r_curves?.length
+      // Iniciar polling
+      setTimeout(pollProgress, 1000);
+
+    } catch (err: any) {
+      console.error("Error starting processing:", err);
+      updateState({
+        error: err.message || "Error al procesar el archivo",
+        fileLoaded: false,
+        isLoading: false
+      });
+    }
+  };
+
+  // Función para obtener los resultados del procesamiento
+  const getProcessingResults = async (fileKey: string) => {
+    try {
+      console.log("Obteniendo resultados del procesamiento para file_key:", fileKey);
+
+      const resultsResponse = await fetch(`https://studio-2lx4.onrender.com/api/multifinger-caliper/processing-results/${fileKey}`);
+
+      if (!resultsResponse.ok) {
+        throw new Error("Resultados no disponibles aún");
+      }
+
+      const data = await resultsResponse.json();
+      console.log("Resultados obtenidos:", data);
+
+      // Count number of fingers (R curves)
+      const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+      const numFingers = rCurves.length;
+
+      updateState({
+        fileInfo: `File processed: ${fileKey}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+        fileLoaded: true,
+        isProcessed: false,
+        isLoading: false
+      });
+
+    } catch (err: any) {
+      console.error("Error getting results:", err);
+      updateState({
+        error: "Error al obtener resultados del procesamiento",
+        fileLoaded: false,
+        isLoading: false
+      });
+    }
+  };
+
+  // Función para manejar el botón "Process Data" con progreso real
+  const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
+    console.log("Procesando datos del caliper...");
+    updateState({ isProcessing: true, error: null });
+    setProcessProgress(0);
+
+    try {
+      // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
+      const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
+
+      // Iniciar procesamiento con el endpoint existente
+      const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ use_centralized: useCentralized }),
+        signal: AbortSignal.timeout(900000), // 15 minutes timeout
       });
 
       if (!response.ok) {
-        if (data.detail && data.detail.startsWith("ERROR:")) {
-          throw new Error(data.detail.replace("ERROR: ", ""));
+        const errorData = await response.json();
+        if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
+          throw new Error(errorData.detail.replace("ERROR: ", ""));
         }
         throw new Error("Error al procesar los datos del caliper.");
       }
+
+      const data = await response.json();
+      console.log("Respuesta del procesamiento:", data);
+
+      // Mostrar progreso completo
+      setProcessProgress(100);
 
       updateState({ plotData: data, isProcessed: true });
       console.log("Datos del gráfico procesados correctamente");
@@ -1111,7 +1194,7 @@ export default function MultifingerCaliperPage() {
     } catch (err: any) {
       console.error("Error al procesar datos:", err);
       updateState({
-        error: "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
+        error: err.message || "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
         plotData: null
       });
     } finally {
