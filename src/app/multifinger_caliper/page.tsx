@@ -940,10 +940,13 @@ export default function MultifingerCaliperPage() {
             console.log("Archivo subido exitosamente a R2");
             setUploadProgress(100);
 
-            // El procesamiento comenzará automáticamente
-
-            // Paso 3: Procesar archivo desde R2
-            await processFileFromR2(uploadData.file_key);
+            // Solo guardar el file_key, no procesar automáticamente
+            updateState({
+              fileInfo: `File uploaded successfully to R2. File key: ${uploadData.file_key}`,
+              fileLoaded: true,
+              isLoading: false,
+              currentFileKey: uploadData.file_key
+            });
 
           } else {
             console.error("Error al subir a R2:", xhr.status, xhr.responseText);
@@ -969,8 +972,7 @@ export default function MultifingerCaliperPage() {
           updateState({
             error: "Timeout al subir el archivo (demasiado grande)",
             fileLoaded: false,
-            isLoading: false,
-            uploadStatusMessage: null
+            isLoading: false
           });
         };
 
@@ -1236,7 +1238,7 @@ export default function MultifingerCaliperPage() {
             <div className="flex flex-col items-center space-y-4">
               <button
                 onClick={handleButtonClick}
-                disabled={isLoading || (fileLoaded && !isProcessed)}
+                disabled={isLoading || fileLoaded}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isLoading ? "Reading..." : "Load .LAS"}
@@ -1264,17 +1266,29 @@ export default function MultifingerCaliperPage() {
               {error && <p className="text-red-600">{error}</p>}
             </div>
 
-            {/* Botón Process Data - aparece cuando se ha procesado un archivo */}
-            {isProcessed && (
+            {/* Botón Process Data - aparece cuando se ha cargado un archivo pero no procesado */}
+            {fileLoaded && !isProcessed && (
               <div className="w-full flex flex-col items-center mt-20 space-y-4">
                 <button
                   onClick={handleProcessData}
                   disabled={isProcessing}
                   className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? "Processing..." : isProcessed ? "Reprocess Data" : "Process Data"}
+                  {isProcessing ? "Processing..." : "Process Data"}
                 </button>
+              </div>
+            )}
 
+            {/* Botón para cargar nuevo archivo - aparece cuando ya hay un archivo procesado */}
+            {isProcessed && (
+              <div className="w-full flex flex-col items-center mt-20 space-y-4">
+                <button
+                  onClick={handleButtonClick}
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? "Loading..." : "Load New .LAS"}
+                </button>
               </div>
             )}
 
