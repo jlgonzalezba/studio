@@ -1311,15 +1311,15 @@ export default function MultifingerCaliperPage() {
               {error && <p className="text-red-600">{error}</p>}
             </div>
 
-            {/* Botón Process Data - aparece solo cuando se ha cargado un archivo */}
+            {/* Botón Process Data - aparece cuando se ha cargado un archivo */}
             {fileLoaded && (
               <div className="w-full flex flex-col items-center mt-20 space-y-4">
                 <button
                   onClick={handleProcessData}
-                  disabled={isProcessing || isProcessed}
+                  disabled={isProcessing}
                   className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? "Processing..." : "Process Data"}
+                  {isProcessing ? "Processing..." : isProcessed ? "Reprocess Data" : "Process Data"}
                 </button>
 
               </div>
