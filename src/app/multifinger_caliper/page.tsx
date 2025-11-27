@@ -896,7 +896,6 @@ export default function MultifingerCaliperPage() {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [processProgress, setProcessProgress] = useState(0);
-    const [uploadStatusMessage, setUploadStatusMessage] = useState<string | null>(null);
 
     const {
         isLoading,
@@ -913,7 +912,8 @@ export default function MultifingerCaliperPage() {
         customMaxDiam,
         isUncentralised,
         showFingerReadings,
-        showCollars
+        showCollars,
+        uploadStatusMessage
     } = state;
 
     const updateState = (updates: any) => {
@@ -998,9 +998,12 @@ export default function MultifingerCaliperPage() {
             // Mostrar mensaje de espera mientras el servidor procesa
             console.log("Setting upload status message...");
             updateState({ uploadStatusMessage: "File uploaded, waiting for server response..." });
+            console.log("Upload status message set to:", "File uploaded, waiting for server response...");
 
             // Paso 2: Procesar archivo desde R2 (el mensaje se mantiene durante todo el procesamiento)
+            console.log("About to call processFileFromR2 with file_key:", uploadData.file_key);
             await processFileFromR2(uploadData.file_key);
+            console.log("processFileFromR2 completed");
 
           } catch (err: any) {
             console.error("Error parsing upload response:", err);
@@ -1275,7 +1278,11 @@ export default function MultifingerCaliperPage() {
                     ></div>
                   </div>
                   <p className="text-sm text-gray-600 mt-2 text-center">
-                    {uploadStatusMessage || `Uploading... ${uploadProgress}%`}
+                    {(() => {
+                      const message = uploadStatusMessage || `Uploading... ${uploadProgress}%`;
+                      console.log("Rendering message:", message);
+                      return message;
+                    })()}
                   </p>
                 </div>
               )}
