@@ -1219,8 +1219,8 @@ export default function MultifingerCaliperPage() {
               {error && <p className="text-red-600">{error}</p>}
             </div>
 
-            {/* Botón Process Data - aparece cuando se ha cargado un archivo */}
-            {fileLoaded && (
+            {/* Botón Process Data - aparece cuando se ha procesado un archivo */}
+            {isProcessed && (
               <div className="w-full flex flex-col items-center mt-20 space-y-4">
                 <button
                   onClick={handleProcessData}
