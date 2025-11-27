@@ -29,3 +29,11 @@ API_VERSION = "v1"
 # File Upload Configuration
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 ALLOWED_EXTENSIONS = [".las", ".csv", ".txt"]
+
+# Cloudflare R2 Configuration
+R2_ACCOUNT_ID = "b8535e30d92db719275627e13419d79a"
+R2_ACCESS_KEY_ID = "3fbdd5682b203f9f446001d92f880321"
+R2_SECRET_ACCESS_KEY = "fcb2049a62759ec2471e6146d8fc2cf071bfbb34520ee1c58f20c8c07394d85f"
+R2_BUCKET_NAME = "enertech3-object-rw"
+R2_REGION = "auto"
+R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

@@ -6,10 +6,20 @@ Handles LAS file processing and analysis for multifinger caliper applications.
 import io
 import lasio
 import gzip
+import uuid
+import boto3
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
 class ProcessCaliperRequest(BaseModel):
+    use_centralized: bool = True
+
+class GetUploadUrlRequest(BaseModel):
+    filename: str
+    content_type: str = "application/octet-stream"
+
+class ProcessFromR2Request(BaseModel):
+    file_key: str
     use_centralized: bool = True
 
 # Import LAS processing module
@@ -18,12 +28,146 @@ from .las_processor import process_las_data, export_las_curves_to_csv
 # Import data management module
 from .df_manage import process_caliper_data
 
+# Import configuration
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (
+    R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID,
+    R2_BUCKET_NAME, R2_REGION, R2_ENDPOINT, MAX_FILE_SIZE
+)
+
 # Create router for multifinger caliper endpoints
 router = APIRouter(prefix="/api/multifinger-caliper", tags=["multifinger-caliper"])
 
 # Global progress variable for processing
 processing_progress = 0
 
+# Initialize R2 client
+def get_r2_client():
+    return boto3.client(
+        's3',
+        endpoint_url=R2_ENDPOINT,
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name=R2_REGION
+    )
+
+@router.post("/get-upload-url")
+async def get_upload_url(request: GetUploadUrlRequest):
+    """
+    Generate a presigned URL for uploading files directly to Cloudflare R2.
+    Returns the presigned URL and the file key for later processing.
+    """
+    try:
+        # Validate file extension
+        if not any(request.filename.lower().endswith(ext) for ext in ['.las', '.gz']):
+            raise HTTPException(status_code=400, detail="ERROR: Only .las and .gz files are allowed")
+
+        # Generate unique file key
+        file_extension = '.las' if not request.filename.lower().endswith('.gz') else '.las.gz'
+        unique_id = str(uuid.uuid4())
+        file_key = f"uploads/{unique_id}_{request.filename}"
+
+        # Create presigned URL
+        s3_client = get_r2_client()
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': R2_BUCKET_NAME,
+                'Key': file_key,
+                'ContentType': request.content_type
+            },
+            ExpiresIn=3600  # 1 hour
+        )
+
+        return {
+            "upload_url": presigned_url,
+            "file_key": file_key,
+            "expires_in": 3600
+        }
+
+    except Exception as e:
+        print(f"[GET-UPLOAD-URL] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"ERROR: Failed to generate upload URL - {str(e)}")
+
+@router.post("/process-from-r2")
+async def process_from_r2(request: ProcessFromR2Request):
+    """
+    Download and process a file from Cloudflare R2.
+    """
+    try:
+        print(f"[PROCESS-R2] Starting processing for file_key: {request.file_key}")
+
+        # Download file from R2
+        s3_client = get_r2_client()
+        response = s3_client.get_object(Bucket=R2_BUCKET_NAME, Key=request.file_key)
+        file_content = response['Body'].read()
+
+        print(f"[PROCESS-R2] Downloaded file size: {len(file_content)} bytes")
+
+        # Validate file size
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"ERROR: File too large. Maximum size is {MAX_FILE_SIZE} bytes")
+
+        # Decompress if .gz
+        if request.file_key.endswith('.gz'):
+            print("[PROCESS-R2] Decompressing .gz file")
+            file_content = gzip.decompress(file_content)
+            print(f"[PROCESS-R2] Decompressed size: {len(file_content)} bytes")
+
+        # Decode content
+        decoded_content = None
+        encodings_to_try = ['utf-8', 'iso-8859-1', 'latin1', 'cp1252']
+
+        for encoding in encodings_to_try:
+            try:
+                decoded_content = file_content.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+
+        if decoded_content is None:
+            raise UnicodeDecodeError("No se pudo decodificar el archivo")
+
+        # Process LAS file
+        print("[PROCESS-R2] Processing LAS data")
+        file_like_object = io.StringIO(decoded_content)
+        las = lasio.read(file_like_object)
+
+        result = process_las_data(las)
+        print("[PROCESS-R2] LAS data processed successfully")
+
+        # Export curves to CSV
+        try:
+            print("[PROCESS-R2] Exporting CSV")
+            csv_paths = export_las_curves_to_csv(las)
+            result["csv_exported"] = csv_paths
+            print("[PROCESS-R2] CSV exported successfully")
+        except Exception as e:
+            print(f"[PROCESS-R2] CSV export error: {e}")
+            result["csv_error"] = str(e)
+
+        print("[PROCESS-R2] Processing completed successfully")
+        return result
+
+    except UnicodeDecodeError as e:
+        print(f"[PROCESS-R2] Unicode decode error: {e}")
+        raise HTTPException(status_code=400, detail="ERROR: El archivo .las debe estar en formato UTF-8. Convierta el archivo a UTF-8 e intente nuevamente.")
+    except ValueError as e:
+        print(f"[PROCESS-R2] Value error: {e}")
+        if "LAS" in str(e):
+            raise HTTPException(status_code=400, detail=f"ERROR: Formato LAS inválido - {str(e)}")
+        raise HTTPException(status_code=400, detail=f"ERROR: Datos inválidos en el archivo - {str(e)}")
+    except Exception as e:
+        print(f"[PROCESS-R2] General error: {e}")
+        error_msg = str(e)
+        if "No curves" in error_msg or "empty" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="ERROR: El archivo .las no contiene curvas válidas o está vacío.")
+        elif "version" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="ERROR: Versión LAS no soportada. Solo se soporta LAS 2.0.")
+        else:
+            raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar el archivo - {error_msg}")
 
 @router.post("/upload")
 async def upload_and_process_las(file: UploadFile = File(...)):

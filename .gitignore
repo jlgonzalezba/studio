@@ -48,3 +48,6 @@ firestore-debug.log
 *.las
 exports/
 public/exports/
+
+# backend config with sensitive data
+backend/config.py
