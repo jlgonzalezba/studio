@@ -896,6 +896,7 @@ export default function MultifingerCaliperPage() {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [processProgress, setProcessProgress] = useState(0);
+    const [uploadStatusMessage, setUploadStatusMessage] = useState<string | null>(null);
 
     const {
         isLoading,
@@ -994,7 +995,10 @@ export default function MultifingerCaliperPage() {
             console.log("Archivo subido exitosamente:", uploadData);
             setUploadProgress(100);
 
-            // Paso 2: Procesar archivo desde R2 con progreso real
+            // Mostrar mensaje de espera mientras el servidor procesa
+            updateState({ uploadStatusMessage: "File uploaded, waiting for server response..." });
+
+            // Paso 2: Procesar archivo desde R2
             await processFileFromR2(uploadData.file_key);
 
           } catch (err: any) {
@@ -1002,7 +1006,8 @@ export default function MultifingerCaliperPage() {
             updateState({
               error: "Error al procesar la respuesta del servidor",
               fileLoaded: false,
-              isLoading: false
+              isLoading: false,
+              uploadStatusMessage: null
             });
           }
         } else {
@@ -1020,7 +1025,8 @@ export default function MultifingerCaliperPage() {
         updateState({
           error: "Error de conexión al subir el archivo",
           fileLoaded: false,
-          isLoading: false
+          isLoading: false,
+          uploadStatusMessage: null
         });
       };
 
@@ -1029,7 +1035,8 @@ export default function MultifingerCaliperPage() {
         updateState({
           error: "Timeout al subir el archivo (demasiado grande)",
           fileLoaded: false,
-          isLoading: false
+          isLoading: false,
+          uploadStatusMessage: null
         });
       };
 
@@ -1081,7 +1088,8 @@ export default function MultifingerCaliperPage() {
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
                 fileLoaded: true,
                 isProcessed: false,
-                isLoading: false
+                isLoading: false,
+                uploadStatusMessage: null
               });
             } else if (progressData.progress >= 0) {
               // Continuar polling si está en progreso
@@ -1120,29 +1128,29 @@ export default function MultifingerCaliperPage() {
       updateState({
         error: err.message || "Error al procesar el archivo",
         fileLoaded: false,
-        isLoading: false
+        isLoading: false,
+        uploadStatusMessage: null
       });
     }
   };
 
 
-  // Función para manejar el botón "Process Data" con progreso real
+  // Función para manejar el botón "Process Data" (sin barra de progreso)
   const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
     console.log("Procesando datos del caliper...");
     updateState({ isProcessing: true, error: null });
-    setProcessProgress(0);
 
     try {
       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-      // Iniciar procesamiento
       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ use_centralized: useCentralized }),
+        signal: AbortSignal.timeout(900000), // 15 minutes timeout
       });
 
       if (!response.ok) {
@@ -1150,59 +1158,23 @@ export default function MultifingerCaliperPage() {
         if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
           throw new Error(errorData.detail.replace("ERROR: ", ""));
         }
-        throw new Error("Error al iniciar procesamiento.");
+        throw new Error("Error al procesar los datos del caliper.");
       }
 
-      // Hacer polling al progreso mientras se procesa
-      const pollProgress = async () => {
-        try {
-          const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
-          if (progressResponse.ok) {
-            const progressData = await progressResponse.json();
-            setProcessProgress(progressData.progress);
+      const data = await response.json();
+      console.log("Respuesta del procesamiento:", data);
 
-            if (progressData.progress >= 100) {
-              // Procesamiento completo, obtener resultados
-              await getProcessingResultsForData();
-            } else if (progressData.progress >= 0) {
-              // Continuar polling si está en progreso
-              setTimeout(pollProgress, 1000); // Poll every second
-            } else {
-              // Error en procesamiento
-              updateState({
-                error: "Error durante el procesamiento del archivo",
-                plotData: null,
-                isProcessing: false
-              });
-            }
-          } else {
-            // Error al consultar progreso
-            updateState({
-              error: "Error al consultar el progreso del procesamiento",
-              plotData: null,
-              isProcessing: false
-            });
-          }
-        } catch (err) {
-          console.error("Error polling progress:", err);
-          updateState({
-            error: "Error de conexión al consultar progreso",
-            plotData: null,
-            isProcessing: false
-          });
-        }
-      };
-
-      // Iniciar polling
-      setTimeout(pollProgress, 1000);
+      updateState({ plotData: data, isProcessed: true });
+      console.log("Datos del gráfico procesados correctamente");
 
     } catch (err: any) {
-      console.error("Error starting processing:", err);
+      console.error("Error al procesar datos:", err);
       updateState({
-        error: err.message || "Error al iniciar procesamiento",
-        plotData: null,
-        isProcessing: false
+        error: err.message || "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
+        plotData: null
       });
+    } finally {
+      updateState({ isProcessing: false });
     }
   };
 
@@ -1302,7 +1274,7 @@ export default function MultifingerCaliperPage() {
                     ></div>
                   </div>
                   <p className="text-sm text-gray-600 mt-2 text-center">
-                    Uploading... {uploadProgress}%
+                    {uploadStatusMessage || `Uploading... ${uploadProgress}%`}
                   </p>
                 </div>
               )}
@@ -1325,20 +1297,6 @@ export default function MultifingerCaliperPage() {
                   {isProcessing ? "Processing..." : "Process Data"}
                 </button>
 
-                {/* Progress bar for processing */}
-                {isProcessing && processProgress > 0 && (
-                  <div className="w-full max-w-md">
-                    <div className="bg-gray-200 rounded-full h-2.5">
-                      <div
-                        className="bg-green-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${processProgress}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-2 text-center">
-                      Processing data... {processProgress}%
-                    </p>
-                  </div>
-                )}
               </div>
             )}
 
