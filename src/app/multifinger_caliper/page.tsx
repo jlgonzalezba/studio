@@ -1060,7 +1060,7 @@ export default function MultifingerCaliperPage() {
         // Configurar la petición para subir a R2
         xhr.open("PUT", uploadData.upload_url);
         xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        xhr.timeout = 900000; // 15 minutes
+        xhr.timeout = 1800000; // 30 minutes
         xhr.send(file);
 
       } catch (err: any) {
@@ -1174,7 +1174,7 @@ export default function MultifingerCaliperPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ use_centralized: useCentralized }),
-        signal: AbortSignal.timeout(900000), // 15 minutes timeout
+        signal: AbortSignal.timeout(1800000), // 30 minutes timeout
       });
 
       if (!response.ok) {
