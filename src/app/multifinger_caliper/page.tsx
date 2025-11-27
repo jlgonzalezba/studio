@@ -1004,12 +1004,10 @@ export default function MultifingerCaliperPage() {
         console.log("Subiendo archivo a R2...");
         setUploadProgress(10);
 
+        // Try without Content-Type header to avoid preflight CORS request
         const uploadResponse = await fetch(uploadData.upload_url, {
           method: "PUT",
           body: file,
-          headers: {
-            "Content-Type": file.type || "application/octet-stream"
-          },
           signal: AbortSignal.timeout(300000), // 5 minutes timeout
         });
 
