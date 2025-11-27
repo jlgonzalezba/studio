@@ -326,31 +326,11 @@ async def process_caliper(request: ProcessCaliperRequest):
     processing_progress = 0
 
     try:
-        # Paso 1: Inicialización
-        processing_progress = 5
-
-        # Paso 2: Cargar CSV
-        processing_progress = 10
-
         result = process_caliper_data(request.use_centralized)
-
-        # Paso 3: Detectar curvas R
-        processing_progress = 30
-
-        # Paso 4: Calcular estadísticas
-        processing_progress = 50
-
-        # Paso 5: Extraer datos crudos
-        processing_progress = 70
-
-        # Paso 6: Procesar collars
-        processing_progress = 90
-
         print("[PROCESS] process_caliper_data completed")
 
         if "error" in result:
             print(f"[PROCESS] Error in result: {result['error']}")
-            processing_progress = -1  # Error state
             raise HTTPException(status_code=400, detail=f"ERROR: {result['error']}")
 
         processing_progress = 100
@@ -359,7 +339,6 @@ async def process_caliper(request: ProcessCaliperRequest):
 
     except Exception as e:
         print(f"[PROCESS] Exception: {e}")
-        processing_progress = -1  # Error state
         error_msg = str(e)
         raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar datos del caliper - {error_msg}")
 

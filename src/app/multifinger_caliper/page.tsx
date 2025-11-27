@@ -573,10 +573,7 @@ const HTML5CanvasPlot = ({
     if (selection.start) {
       setSelection(prev => prev.start ? {start: prev.start, end: {x, y}} : prev);
       setTooltip(null);
-    }
-    // Temporarily disabled tooltip and depth setting to prevent infinite re-renders
-    /*
-    else if (data && data.plot_data) {
+    } else if (data && data.plot_data) {
       const visibleDepthMin = zoomState.minDepth ?? Math.min(...data.plot_data.depth);
       const visibleDepthMax = zoomState.maxDepth ?? Math.max(...data.plot_data.depth);
       const depth = visibleDepthMin + ((y - 15) / 535) * (visibleDepthMax - visibleDepthMin);
@@ -610,7 +607,6 @@ const HTML5CanvasPlot = ({
       setTooltip({show: true, x, y, depth: closest.d, min: minVal, max: maxVal, avg: avgVal, gr: grVal, temp: tempVal});
       setCurrentDepth(closest.d);
     }
-    */
   };
 
   const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -782,23 +778,106 @@ const HTML5CanvasPlot = ({
 };
 
 
-// Cross Section Plot Component - Temporarily simplified to prevent infinite re-renders
+// Cross Section Plot Component
 const CrossSectionPlot = ({ data, currentDepth }: { data: any, currentDepth: number | null }) => {
-  return <div style={{
-    width: '400px',
-    height: '400px',
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!data || !data.raw_data || !currentDepth) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, 400, 400);
+
+    const depths = data.raw_data.depth;
+    const rCurves = data.raw_data.r_curves;
+
+    if (!depths || !Array.isArray(depths) || !rCurves || !Array.isArray(rCurves)) return;
+
+    let index = 0;
+    let minDiff = Math.abs(depths[0] - currentDepth);
+    for (let i = 1; i < depths.length; i++) {
+      const diff = Math.abs(depths[i] - currentDepth);
+      if (diff < minDiff) {
+        minDiff = diff;
+        index = i;
+      }
+    }
+
+    if (index >= rCurves.length) return;
+
+    const r = rCurves[index];
+    console.log('r:', r, 'num:', r ? r.length : 'undefined');
+    if (!r || !Array.isArray(r) || r.length === 0) {
+      ctx.fillStyle = 'black';
+      ctx.font = '16px Arial';
+      ctx.fillText('No cross-section data', 120, 200);
+      return;
+    }
+
+    const num = r.length;
+    const centerX = 200;
+    const centerY = 200;
+
+    const nominalCasingRadius = 3.5; // 7-inch diameter
+    const maxR = r.filter(val => val !== null).reduce((max, val) => Math.max(max, val), -Infinity);
+    if (maxR === 0) return;
+
+    // Determine the radius for scaling to ensure everything fits
+    const scaleRadius = Math.max(nominalCasingRadius, maxR);
+    const scale = 180 / scaleRadius; // fit within 180 pixels
+
+    // Draw fixed 7-inch casing circle
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, nominalCasingRadius * scale, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    // Draw points and lines
+    ctx.strokeStyle = 'blue';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    const points: number[][] = [];
+    for (let i = 0; i < num; i++) {
+      const angle = (i / num) * 2 * Math.PI;
+      const x = centerX + r[i] * scale * Math.cos(angle);
+      const y = centerY + r[i] * scale * Math.sin(angle);
+      points.push([x, y]);
+    }
+
+    // Draw lines
+    for (let i = 0; i < points.length; i++) {
+      const [x, y] = points[i];
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+    // Draw points
+    ctx.fillStyle = 'red';
+    for (const [x, y] of points) {
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+  }, [data, currentDepth]);
+
+  return <canvas ref={canvasRef} width={400} height={400} style={{
     border: '3px solid #2F4F4F',
     borderRadius: '12px',
     boxShadow: '0 8px 16px rgba(37, 99, 235, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1)',
-    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '16px',
-    color: '#666'
-  }}>
-    Cross Section (Disabled to prevent infinite re-renders)
-  </div>;
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+  }} />;
 };
 
 
@@ -833,9 +912,7 @@ export default function MultifingerCaliperPage() {
         customMaxDiam,
         isUncentralised,
         showFingerReadings,
-        showCollars,
-        currentFileKey,
-        // uploadStatusMessage removed to prevent infinite re-renders
+        showCollars
     } = state;
 
     const updateState = (updates: any) => {
@@ -883,7 +960,7 @@ export default function MultifingerCaliperPage() {
   };
 
   // Función que se ejecuta cuando el usuario selecciona un archivo
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       console.log("Archivo seleccionado:", file.name);
@@ -896,108 +973,82 @@ export default function MultifingerCaliperPage() {
         customMinDiam: 4, // Reset to default values
         customMaxDiam: 10,
         isUncentralised: false, // Reset Desentralised toggle when loading new file
-        showCollars: false, // Reset Show Collars checkbox when loading new file
-        currentFileKey: null, // Reset file key when loading new file
-        isProcessed: false // Reset processed state when loading new file
+        showCollars: false // Reset Show Collars checkbox when loading new file
       });
       setUploadProgress(0);
 
-      try {
-        // Paso 1: Obtener URL presigned del backend
-        console.log("Obteniendo URL presigned...");
-        const uploadUrlResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/get-upload-url", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            filename: file.name,
-            content_type: file.type || "application/octet-stream"
-          }),
-        });
+      // Usar XMLHttpRequest para tener progreso real de subida
+      const xhr = new XMLHttpRequest();
 
-        if (!uploadUrlResponse.ok) {
-          const errorData = await uploadUrlResponse.json();
-          throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al obtener URL de subida");
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setUploadProgress(Math.round(percentComplete));
         }
+      };
 
-        const uploadData = await uploadUrlResponse.json();
-        console.log("URL presigned obtenida:", uploadData);
-
-        // Paso 2: Subir archivo directamente a R2 con progreso real
-        console.log("Subiendo archivo a R2...");
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 100;
-            setUploadProgress(Math.round(percentComplete));
-          }
-        };
-
-        xhr.onload = async () => {
-          if (xhr.status === 200) {
-            console.log("Archivo subido exitosamente a R2");
+      xhr.onload = async () => {
+        if (xhr.status === 200) {
+          try {
+            const uploadData = JSON.parse(xhr.responseText);
+            console.log("Archivo subido exitosamente:", uploadData);
             setUploadProgress(100);
 
-            // Solo guardar el file_key, no procesar automáticamente
-            updateState({
-              fileInfo: `File uploaded successfully to R2. File key: ${uploadData.file_key}`,
-              fileLoaded: true,
-              isLoading: false,
-              currentFileKey: uploadData.file_key
-            });
+            // Paso 2: Procesar archivo desde R2 con progreso real
+            await processFileFromR2(uploadData.file_key);
 
-          } else {
-            console.error("Error al subir a R2:", xhr.status, xhr.responseText);
+          } catch (err: any) {
+            console.error("Error parsing upload response:", err);
             updateState({
-              error: "Error al subir archivo a R2",
+              error: "Error al procesar la respuesta del servidor",
               fileLoaded: false,
               isLoading: false
             });
           }
-        };
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al subir archivo");
+          } catch {
+            throw new Error("Error al subir archivo");
+          }
+        }
+      };
 
-        xhr.onerror = () => {
-          console.error("Upload failed");
-          updateState({
-            error: "Error de conexión al subir el archivo",
-            fileLoaded: false,
-            isLoading: false
-          });
-        };
-
-        xhr.ontimeout = () => {
-          console.error("Upload timeout");
-          updateState({
-            error: "Timeout al subir el archivo (demasiado grande)",
-            fileLoaded: false,
-            isLoading: false
-          });
-        };
-
-        // Configurar la petición para subir a R2
-        xhr.open("PUT", uploadData.upload_url);
-        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        xhr.timeout = 900000; // 15 minutes
-        xhr.send(file);
-
-      } catch (err: any) {
-        console.error("Error in file upload process:", err);
+      xhr.onerror = () => {
+        console.error("Upload failed");
         updateState({
-          error: err.message || "Error al procesar la subida del archivo",
+          error: "Error de conexión al subir el archivo",
           fileLoaded: false,
           isLoading: false
         });
-      }
+      };
+
+      xhr.ontimeout = () => {
+        console.error("Upload timeout");
+        updateState({
+          error: "Timeout al subir el archivo (demasiado grande)",
+          fileLoaded: false,
+          isLoading: false
+        });
+      };
+
+      // Configurar la petición
+      xhr.open("POST", "https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-via-proxy");
+      xhr.timeout = 900000; // 15 minutes
+
+      // Crear FormData y enviar
+      const formData = new FormData();
+      formData.append("file", file);
+      xhr.send(formData);
     }
   };
 
   // Función para procesar archivo desde R2 con progreso real
   const processFileFromR2 = async (fileKey: string) => {
-    let pollInterval: NodeJS.Timeout | null = null;
-
     try {
+      console.log("Procesando archivo desde R2...");
+
       // Iniciar procesamiento
       const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
         method: "POST",
@@ -1015,8 +1066,8 @@ export default function MultifingerCaliperPage() {
         throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al iniciar procesamiento");
       }
 
-      // Hacer polling al progreso mientras se procesa usando setInterval
-      pollInterval = setInterval(async () => {
+      // Hacer polling al progreso mientras se procesa
+      const pollProgress = async () => {
         try {
           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
           if (progressResponse.ok) {
@@ -1024,18 +1075,19 @@ export default function MultifingerCaliperPage() {
             setProcessProgress(progressData.progress);
 
             if (progressData.progress >= 100) {
-              // Procesamiento completo - obtener resultados y marcar como listo
-              if (pollInterval) clearInterval(pollInterval);
+              // Procesamiento completo - marcar como listo
+              console.log("Procesamiento completado exitosamente");
               updateState({
                 fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
                 fileLoaded: true,
-                isProcessed: true,
-                isLoading: false,
-                currentFileKey: fileKey
+                isProcessed: false,
+                isLoading: false
               });
-            } else if (progressData.progress < 0) {
+            } else if (progressData.progress >= 0) {
+              // Continuar polling si está en progreso
+              setTimeout(pollProgress, 1000); // Poll every second
+            } else {
               // Error en procesamiento
-              if (pollInterval) clearInterval(pollInterval);
               updateState({
                 error: "Error durante el procesamiento del archivo",
                 fileLoaded: false,
@@ -1044,7 +1096,6 @@ export default function MultifingerCaliperPage() {
             }
           } else {
             // Error al consultar progreso
-            if (pollInterval) clearInterval(pollInterval);
             updateState({
               error: "Error al consultar el progreso del procesamiento",
               fileLoaded: false,
@@ -1052,151 +1103,74 @@ export default function MultifingerCaliperPage() {
             });
           }
         } catch (err) {
-          if (pollInterval) clearInterval(pollInterval);
+          console.error("Error polling progress:", err);
           updateState({
             error: "Error de conexión al consultar progreso",
             fileLoaded: false,
             isLoading: false
           });
         }
-      }, 2000); // Poll every 2 seconds to reduce load
+      };
+
+      // Iniciar polling
+      setTimeout(pollProgress, 1000);
 
     } catch (err: any) {
-      if (pollInterval) clearInterval(pollInterval);
+      console.error("Error starting processing:", err);
       updateState({
         error: err.message || "Error al procesar el archivo",
         fileLoaded: false,
-        isLoading: false,
-        uploadStatusMessage: null
+        isLoading: false
       });
     }
   };
 
 
-  // Función para manejar el botón "Process Data" - reprocesa desde R2
-   const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
-     console.log("Reprocesando datos desde R2...");
-     updateState({ isProcessing: true, error: null });
+  // Función para manejar el botón "Process Data" con progreso real
+  const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
+    console.log("Procesando datos del caliper...");
+    updateState({ isProcessing: true, error: null });
+    setProcessProgress(0);
 
-     try {
-       // Verificar que tenemos un file_key para reprocesar
-       if (!currentFileKey) {
-         updateState({
-           error: "No hay archivo para reprocesar. Por favor, sube un archivo primero.",
-           isProcessing: false
-         });
-         return;
-       }
-
-       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
-       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
-
-       // Iniciar reprocesamiento desde R2
-       const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-         },
-         body: JSON.stringify({
-           file_key: currentFileKey,
-           use_centralized: useCentralized
-         }),
-       });
-
-       if (!processResponse.ok) {
-         const errorData = await processResponse.json();
-         throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al iniciar reprocesamiento");
-       }
-
-       // Hacer polling hasta que termine el reprocesamiento
-       const pollInterval = setInterval(async () => {
-         try {
-           const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
-           if (progressResponse.ok) {
-             const progressData = await progressResponse.json();
-             setProcessProgress(progressData.progress);
-
-             if (progressData.progress >= 100) {
-               // Reprocesamiento completo - obtener resultados
-               clearInterval(pollInterval);
-               await getProcessingResultsForData();
-               updateState({
-                 isProcessing: false
-               });
-             } else if (progressData.progress < 0) {
-               // Error en reprocesamiento
-               clearInterval(pollInterval);
-               updateState({
-                 error: "Error durante el reprocesamiento del archivo",
-                 isProcessing: false
-               });
-             }
-           } else {
-             clearInterval(pollInterval);
-             updateState({
-               error: "Error al consultar el progreso del reprocesamiento",
-               isProcessing: false
-             });
-           }
-         } catch (err) {
-           clearInterval(pollInterval);
-           updateState({
-             error: "Error de conexión durante el reprocesamiento",
-             isProcessing: false
-           });
-         }
-       }, 2000); // Poll every 2 seconds
-
-     } catch (err: any) {
-       console.error("Error al reprocesar datos:", err);
-       updateState({
-         error: err.message || "Error reprocessing caliper data.",
-         plotData: null,
-         isProcessing: false
-       });
-     }
-   };
-
-  // Función para obtener los resultados del procesamiento de datos
-  const getProcessingResultsForData = async () => {
     try {
-      console.log("Obteniendo resultados del procesamiento de datos");
+      // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
+      const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-      // Obtener el estado actual para determinar si usar centralized o no
-      const currentState = state;
-      const useCentralized = !currentState.isUncentralised;
-
+      // Iniciar procesamiento con el endpoint existente
       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ use_centralized: useCentralized }),
+        signal: AbortSignal.timeout(900000), // 15 minutes timeout
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al obtener resultados");
+        if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
+          throw new Error(errorData.detail.replace("ERROR: ", ""));
+        }
+        throw new Error("Error al procesar los datos del caliper.");
       }
 
       const data = await response.json();
-      console.log("Resultados obtenidos:", data);
+      console.log("Respuesta del procesamiento:", data);
 
-      updateState({
-        plotData: data,
-        isProcessed: true,
-        isProcessing: false
-      });
+      // Mostrar progreso completo
+      setProcessProgress(100);
 
+      updateState({ plotData: data, isProcessed: true });
       console.log("Datos del gráfico procesados correctamente");
 
     } catch (err: any) {
-      console.error("Error getting results:", err);
+      console.error("Error al procesar datos:", err);
       updateState({
-        error: "Error al obtener resultados del procesamiento",
-        plotData: null,
-        isProcessing: false
+        error: err.message || "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
+        plotData: null
       });
+    } finally {
+      updateState({ isProcessing: false });
     }
   };
 
@@ -1238,7 +1212,7 @@ export default function MultifingerCaliperPage() {
             <div className="flex flex-col items-center space-y-4">
               <button
                 onClick={handleButtonClick}
-                disabled={isLoading || fileLoaded}
+                disabled={isLoading || (fileLoaded && !isProcessed)}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isLoading ? "Reading..." : "Load .LAS"}
@@ -1254,7 +1228,7 @@ export default function MultifingerCaliperPage() {
                     ></div>
                   </div>
                   <p className="text-sm text-gray-600 mt-2 text-center">
-                    {uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : 'Processing file...'}
+                    Uploading... {uploadProgress}%
                   </p>
                 </div>
               )}
@@ -1266,29 +1240,31 @@ export default function MultifingerCaliperPage() {
               {error && <p className="text-red-600">{error}</p>}
             </div>
 
-            {/* Botón Process Data - aparece cuando se ha cargado un archivo pero no procesado */}
-            {fileLoaded && !isProcessed && (
+            {/* Botón Process Data - aparece solo cuando se ha cargado un archivo */}
+            {fileLoaded && (
               <div className="w-full flex flex-col items-center mt-20 space-y-4">
                 <button
                   onClick={handleProcessData}
-                  disabled={isProcessing}
+                  disabled={isProcessing || isProcessed}
                   className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   {isProcessing ? "Processing..." : "Process Data"}
                 </button>
-              </div>
-            )}
 
-            {/* Botón para cargar nuevo archivo - aparece cuando ya hay un archivo procesado */}
-            {isProcessed && (
-              <div className="w-full flex flex-col items-center mt-20 space-y-4">
-                <button
-                  onClick={handleButtonClick}
-                  disabled={isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? "Loading..." : "Load New .LAS"}
-                </button>
+                {/* Progress bar for processing */}
+                {isProcessing && processProgress > 0 && (
+                  <div className="w-full max-w-md">
+                    <div className="bg-gray-200 rounded-full h-2.5">
+                      <div
+                        className="bg-green-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${processProgress}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2 text-center">
+                      Processing data... {processProgress}%
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

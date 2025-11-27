@@ -27,7 +27,7 @@ API_PREFIX = "/api"
 API_VERSION = "v1"
 
 # File Upload Configuration
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 ALLOWED_EXTENSIONS = [".las", ".csv", ".txt"]
 
 # Cloudflare R2 Configuration
