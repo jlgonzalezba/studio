@@ -8,7 +8,6 @@ import lasio
 import gzip
 import uuid
 import boto3
-import asyncio
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
@@ -327,24 +326,12 @@ async def process_caliper(request: ProcessCaliperRequest):
     processing_progress = 0
 
     try:
-        # Simulate progress steps for the processing
-        processing_progress = 10
-        await asyncio.sleep(0.1)  # Small delay to show progress
-
-        processing_progress = 30
-        await asyncio.sleep(0.1)
-
-        processing_progress = 50
         result = process_caliper_data(request.use_centralized)
         print("[PROCESS] process_caliper_data completed")
 
         if "error" in result:
             print(f"[PROCESS] Error in result: {result['error']}")
-            processing_progress = -1  # Error state
             raise HTTPException(status_code=400, detail=f"ERROR: {result['error']}")
-
-        processing_progress = 80
-        await asyncio.sleep(0.1)
 
         processing_progress = 100
         print("[PROCESS] Process completed successfully")
@@ -352,7 +339,6 @@ async def process_caliper(request: ProcessCaliperRequest):
 
     except Exception as e:
         print(f"[PROCESS] Exception: {e}")
-        processing_progress = -1  # Error state
         error_msg = str(e)
         raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar datos del caliper - {error_msg}")
 
