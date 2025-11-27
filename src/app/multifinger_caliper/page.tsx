@@ -988,7 +988,7 @@ export default function MultifingerCaliperPage() {
         const uploadResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-via-proxy", {
           method: "POST",
           body: formData,
-          signal: AbortSignal.timeout(300000), // 5 minutes timeout
+          signal: AbortSignal.timeout(900000), // 15 minutes timeout for large files
         });
 
         if (!uploadResponse.ok) {
@@ -1011,7 +1011,7 @@ export default function MultifingerCaliperPage() {
             file_key: uploadData.file_key,
             use_centralized: true
           }),
-          signal: AbortSignal.timeout(300000), // 5 minutes timeout
+          signal: AbortSignal.timeout(900000), // 15 minutes timeout for processing
         });
 
         setUploadProgress(100);
