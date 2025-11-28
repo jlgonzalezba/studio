@@ -60,6 +60,24 @@ const HTML5CanvasPlot = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Prevent infinite re-renders by checking if data actually changed
+    const dataSignature = JSON.stringify({
+      depthLength: data.plot_data.depth?.length,
+      minDiameterLength: data.plot_data.min_diameter?.length,
+      maxDiameterLength: data.plot_data.max_diameter?.length,
+      avgDiameterLength: data.plot_data.avg_diameter?.length,
+      zoomMinDepth: zoomState.minDepth,
+      zoomMaxDepth: zoomState.maxDepth,
+      showFingerReadings,
+      showCollars
+    });
+
+    // Use a ref to store the last signature and prevent unnecessary re-renders
+    if (canvas.dataset.lastDataSignature === dataSignature) {
+      return;
+    }
+    canvas.dataset.lastDataSignature = dataSignature;
+
     const { plot_data, raw_data } = data;
 
     // Clear canvas
@@ -327,169 +345,168 @@ const HTML5CanvasPlot = ({
       ctx.fillRect(10, startY, 580, endY - startY);
     }
 
-    // Add HTML labels
+    // Add HTML labels - only if container exists and is empty
     if (mountRef.current) {
-      // Clear previous labels
-      const labels = mountRef.current.querySelectorAll('.plot-label');
-      labels.forEach(label => label.remove());
-
-      // Y axis labels (depth)
-      for (let i = 0; i <= 10; i++) {
-        const depthValue = visibleDepthMin + (i / 10) * (visibleDepthMax - visibleDepthMin);
-        const label = document.createElement('div');
-        label.className = 'plot-label';
-        label.textContent = depthValue.toFixed(0);
-        label.style.position = 'absolute';
-        label.style.left = '-40px';
-        label.style.width = '35px';
-        label.style.textAlign = 'right';
-        const y = 15 + (i / 10) * 535;
-        const topPosition = y;
-        label.style.top = `${topPosition}px`;
-        label.style.transform = 'translateY(-50%)';
-        label.style.fontSize = '10px';
-        label.style.color = 'black';
-        label.style.pointerEvents = 'none';
-        mountRef.current.appendChild(label);
-      }
-
-      // X axis labels (diameter) - use custom scale if enabled
-      const displayMinDiam = useCustomScale ? customMinDiam : diamMin;
-      const displayMaxDiam = useCustomScale ? customMaxDiam : diamMax;
-      for (let i = 0; i <= 5; i++) {
-        const diamValue = displayMinDiam + (i / 5) * (displayMaxDiam - displayMinDiam);
-        const label = document.createElement('div');
-        label.className = 'plot-label';
-        label.textContent = diamValue.toFixed(2) + '"';
-        label.style.position = 'absolute';
-        label.style.bottom = '5px';
-        const leftPosition = 10 + (i / 5) * 380;
-        label.style.left = `${leftPosition}px`;
-        label.style.transform = 'translateX(-50%)';
-        label.style.fontSize = '10px';
-        label.style.color = 'black';
-        label.style.pointerEvents = 'none';
-        mountRef.current.appendChild(label);
-      }
-
-      // GR X axis labels (only min and max)
-      for (let i of [0, 5]) {
-        const grValue = grMin + (i / 5) * (grMax - grMin);
-        const label = document.createElement('div');
-        label.className = 'plot-label';
-        label.textContent = Math.round(grValue).toString();
-        label.style.position = 'absolute';
-        label.style.bottom = '5px';
-        const leftPosition = 410 + (i / 5) * 80;
-        label.style.left = `${leftPosition}px`;
-        label.style.transform = 'translateX(-50%)';
-        label.style.fontSize = '10px';
-        label.style.color = 'black';
-        label.style.pointerEvents = 'none';
-        mountRef.current.appendChild(label);
-      }
-
-      // Temp X axis labels (only min and max)
-      for (let i of [0, 5]) {
-        const tempValue = tempMin + (i / 5) * (tempMax - tempMin);
-        const label = document.createElement('div');
-        label.className = 'plot-label';
-        label.textContent = Math.round(tempValue).toString();
-        label.style.position = 'absolute';
-        label.style.bottom = '5px';
-        const leftPosition = 510 + (i / 5) * 80;
-        label.style.left = `${leftPosition}px`;
-        label.style.transform = 'translateX(-50%)';
-        label.style.fontSize = '10px';
-        label.style.color = 'black';
-        label.style.pointerEvents = 'none';
-        mountRef.current.appendChild(label);
-      }
-
-      // Finger readings axis labels if enabled
-      if (showFingerReadings && raw_data.r_curves && raw_data.r_curves.length > 0) {
-        const numFingers = raw_data.r_curves[0]?.length || 0;
-
-        // Finger readings title
-        const fingerTitle = document.createElement('div');
-        fingerTitle.className = 'plot-label';
-        fingerTitle.textContent = 'Finger Readings (R01-R' + numFingers.toString().padStart(2, '0') + ')';
-        fingerTitle.style.position = 'absolute';
-        fingerTitle.style.bottom = '-35px';
-        fingerTitle.style.left = '745px';
-        fingerTitle.style.transform = 'translateX(-50%)';
-        fingerTitle.style.fontSize = '12px';
-        fingerTitle.style.color = 'black';
-        fingerTitle.style.pointerEvents = 'none';
-        mountRef.current.appendChild(fingerTitle);
-
-        // Finger number labels
-        for (let i = 0; i <= numFingers; i += Math.max(1, Math.floor(numFingers / 5))) {
-          const fingerNum = i + 1;
+      const existingLabels = mountRef.current.querySelectorAll('.plot-label');
+      if (existingLabels.length === 0) { // Only create labels if they don't exist
+        // Y axis labels (depth)
+        for (let i = 0; i <= 10; i++) {
+          const depthValue = visibleDepthMin + (i / 10) * (visibleDepthMax - visibleDepthMin);
           const label = document.createElement('div');
           label.className = 'plot-label';
-          label.textContent = 'R' + fingerNum.toString().padStart(2, '0');
+          label.textContent = depthValue.toFixed(0);
           label.style.position = 'absolute';
-          label.style.bottom = '5px';
-          const leftPosition = 620 + (i / numFingers) * 260;
-          label.style.left = `${leftPosition}px`;
-          label.style.transform = 'translateX(-50%)';
-          label.style.fontSize = '8px';
+          label.style.left = '-40px';
+          label.style.width = '35px';
+          label.style.textAlign = 'right';
+          const y = 15 + (i / 10) * 535;
+          const topPosition = y;
+          label.style.top = `${topPosition}px`;
+          label.style.transform = 'translateY(-50%)';
+          label.style.fontSize = '10px';
           label.style.color = 'black';
           label.style.pointerEvents = 'none';
           mountRef.current.appendChild(label);
         }
+
+        // X axis labels (diameter) - use custom scale if enabled
+        const displayMinDiam = useCustomScale ? customMinDiam : diamMin;
+        const displayMaxDiam = useCustomScale ? customMaxDiam : diamMax;
+        for (let i = 0; i <= 5; i++) {
+          const diamValue = displayMinDiam + (i / 5) * (displayMaxDiam - displayMinDiam);
+          const label = document.createElement('div');
+          label.className = 'plot-label';
+          label.textContent = diamValue.toFixed(2) + '"';
+          label.style.position = 'absolute';
+          label.style.bottom = '5px';
+          const leftPosition = 10 + (i / 5) * 380;
+          label.style.left = `${leftPosition}px`;
+          label.style.transform = 'translateX(-50%)';
+          label.style.fontSize = '10px';
+          label.style.color = 'black';
+          label.style.pointerEvents = 'none';
+          mountRef.current.appendChild(label);
+        }
+
+        // GR X axis labels (only min and max)
+        for (let i of [0, 5]) {
+          const grValue = grMin + (i / 5) * (grMax - grMin);
+          const label = document.createElement('div');
+          label.className = 'plot-label';
+          label.textContent = Math.round(grValue).toString();
+          label.style.position = 'absolute';
+          label.style.bottom = '5px';
+          const leftPosition = 410 + (i / 5) * 80;
+          label.style.left = `${leftPosition}px`;
+          label.style.transform = 'translateX(-50%)';
+          label.style.fontSize = '10px';
+          label.style.color = 'black';
+          label.style.pointerEvents = 'none';
+          mountRef.current.appendChild(label);
+        }
+
+        // Temp X axis labels (only min and max)
+        for (let i of [0, 5]) {
+          const tempValue = tempMin + (i / 5) * (tempMax - tempMin);
+          const label = document.createElement('div');
+          label.className = 'plot-label';
+          label.textContent = Math.round(tempValue).toString();
+          label.style.position = 'absolute';
+          label.style.bottom = '5px';
+          const leftPosition = 510 + (i / 5) * 80;
+          label.style.left = `${leftPosition}px`;
+          label.style.transform = 'translateX(-50%)';
+          label.style.fontSize = '10px';
+          label.style.color = 'black';
+          label.style.pointerEvents = 'none';
+          mountRef.current.appendChild(label);
+        }
+
+        // Finger readings axis labels if enabled
+        if (showFingerReadings && raw_data.r_curves && raw_data.r_curves.length > 0) {
+          const numFingers = raw_data.r_curves[0]?.length || 0;
+
+          // Finger readings title
+          const fingerTitle = document.createElement('div');
+          fingerTitle.className = 'plot-label';
+          fingerTitle.textContent = 'Finger Readings (R01-R' + numFingers.toString().padStart(2, '0') + ')';
+          fingerTitle.style.position = 'absolute';
+          fingerTitle.style.bottom = '-35px';
+          fingerTitle.style.left = '745px';
+          fingerTitle.style.transform = 'translateX(-50%)';
+          fingerTitle.style.fontSize = '12px';
+          fingerTitle.style.color = 'black';
+          fingerTitle.style.pointerEvents = 'none';
+          mountRef.current.appendChild(fingerTitle);
+
+          // Finger number labels
+          for (let i = 0; i <= numFingers; i += Math.max(1, Math.floor(numFingers / 5))) {
+            const fingerNum = i + 1;
+            const label = document.createElement('div');
+            label.className = 'plot-label';
+            label.textContent = 'R' + fingerNum.toString().padStart(2, '0');
+            label.style.position = 'absolute';
+            label.style.bottom = '5px';
+            const leftPosition = 620 + (i / numFingers) * 260;
+            label.style.left = `${leftPosition}px`;
+            label.style.transform = 'translateX(-50%)';
+            label.style.fontSize = '8px';
+            label.style.color = 'black';
+            label.style.pointerEvents = 'none';
+            mountRef.current.appendChild(label);
+          }
+        }
+
+        // Axis titles
+        const xTitle = document.createElement('div');
+        xTitle.className = 'plot-label';
+        xTitle.textContent = 'Diameter (inches)';
+        xTitle.style.position = 'absolute';
+        xTitle.style.bottom = '-35px';
+        xTitle.style.left = '50%';
+        xTitle.style.transform = 'translateX(-50%)';
+        xTitle.style.fontSize = '12px';
+        xTitle.style.color = 'black';
+        xTitle.style.pointerEvents = 'none';
+        mountRef.current.appendChild(xTitle);
+
+        const grTitle = document.createElement('div');
+        grTitle.className = 'plot-label';
+        grTitle.textContent = 'GR (API)';
+        grTitle.style.position = 'absolute';
+        grTitle.style.bottom = '-35px';
+        grTitle.style.left = '450px';
+        grTitle.style.transform = 'translateX(-50%)';
+        grTitle.style.fontSize = '12px';
+        grTitle.style.color = 'black';
+        grTitle.style.pointerEvents = 'none';
+        mountRef.current.appendChild(grTitle);
+
+        const tempTitle = document.createElement('div');
+        tempTitle.className = 'plot-label';
+        tempTitle.textContent = 'Temp (°F)';
+        tempTitle.style.position = 'absolute';
+        tempTitle.style.bottom = '-35px';
+        tempTitle.style.left = '550px';
+        tempTitle.style.transform = 'translateX(-50%)';
+        tempTitle.style.fontSize = '12px';
+        tempTitle.style.color = 'black';
+        tempTitle.style.pointerEvents = 'none';
+        mountRef.current.appendChild(tempTitle);
+
+        const yTitle = document.createElement('div');
+        yTitle.className = 'plot-label';
+        yTitle.textContent = 'Depth (feet)';
+        yTitle.style.position = 'absolute';
+        yTitle.style.top = '50%';
+        yTitle.style.left = '-65px';
+        yTitle.style.transform = 'rotate(-90deg) translateY(-50%)';
+        yTitle.style.transformOrigin = 'left center';
+        yTitle.style.fontSize = '12px';
+        yTitle.style.color = 'black';
+        yTitle.style.pointerEvents = 'none';
+        mountRef.current.appendChild(yTitle);
       }
-
-      // Axis titles
-      const xTitle = document.createElement('div');
-      xTitle.className = 'plot-label';
-      xTitle.textContent = 'Diameter (inches)';
-      xTitle.style.position = 'absolute';
-      xTitle.style.bottom = '-35px';
-      xTitle.style.left = '50%';
-      xTitle.style.transform = 'translateX(-50%)';
-      xTitle.style.fontSize = '12px';
-      xTitle.style.color = 'black';
-      xTitle.style.pointerEvents = 'none';
-      mountRef.current.appendChild(xTitle);
-
-      const grTitle = document.createElement('div');
-      grTitle.className = 'plot-label';
-      grTitle.textContent = 'GR (API)';
-      grTitle.style.position = 'absolute';
-      grTitle.style.bottom = '-35px';
-      grTitle.style.left = '450px';
-      grTitle.style.transform = 'translateX(-50%)';
-      grTitle.style.fontSize = '12px';
-      grTitle.style.color = 'black';
-      grTitle.style.pointerEvents = 'none';
-      mountRef.current.appendChild(grTitle);
-
-      const tempTitle = document.createElement('div');
-      tempTitle.className = 'plot-label';
-      tempTitle.textContent = 'Temp (°F)';
-      tempTitle.style.position = 'absolute';
-      tempTitle.style.bottom = '-35px';
-      tempTitle.style.left = '550px';
-      tempTitle.style.transform = 'translateX(-50%)';
-      tempTitle.style.fontSize = '12px';
-      tempTitle.style.color = 'black';
-      tempTitle.style.pointerEvents = 'none';
-      mountRef.current.appendChild(tempTitle);
-
-      const yTitle = document.createElement('div');
-      yTitle.className = 'plot-label';
-      yTitle.textContent = 'Depth (feet)';
-      yTitle.style.position = 'absolute';
-      yTitle.style.top = '50%';
-      yTitle.style.left = '-65px';
-      yTitle.style.transform = 'rotate(-90deg) translateY(-50%)';
-      yTitle.style.transformOrigin = 'left center';
-      yTitle.style.fontSize = '12px';
-      yTitle.style.color = 'black';
-      yTitle.style.pointerEvents = 'none';
-      mountRef.current.appendChild(yTitle);
     }
 
     // Draw horizontal tracking line
