@@ -1093,7 +1093,7 @@ export default function MultifingerCaliperPage() {
               // Error en procesamiento o timeout
               clearInterval(pollInterval);
               updateState({
-                error: progressData.progress < 0 ? "Error durante el procesamiento del archivo" : "Timeout: procesamiento tomó demasiado tiempo",
+                error: progressData.progress < 0 ? "Error while file processing" : "Timeout",
                 fileLoaded: false,
                 isLoading: false
               });
