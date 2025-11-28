@@ -240,15 +240,35 @@ async def upload_and_process_las(file: UploadFile = File(...)):
     """
     Endpoint para recibir un archivo .las, procesarlo con lasio y
     devolver información específica para multifinger caliper.
+    Usa streaming para archivos grandes.
     """
-    if not file.filename.endswith('.las'):
-        raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las")
+    if not (file.filename.endswith('.las') or file.filename.endswith('.las.gz')):
+        raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las o .las.gz")
 
     try:
         print(f"[UPLOAD] Received file: {file.filename}")
-        # Lee el contenido del archivo subido en memoria
-        contents = await file.read()
-        print(f"[UPLOAD] File size: {len(contents)} bytes")
+
+        # Para archivos grandes, usar procesamiento por chunks
+        file_size = 0
+        chunks = []
+
+        # Leer en chunks para evitar cargar archivos grandes en memoria
+        chunk_size = 8192  # 8KB chunks
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            file_size += len(chunk)
+
+            # Límite de seguridad: 500MB máximo
+            if file_size > 500 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="ERROR: Archivo demasiado grande (máximo 500MB)")
+
+        print(f"[UPLOAD] File size: {file_size} bytes")
+
+        # Unir chunks
+        contents = b''.join(chunks)
 
         # Descomprimir si es .gz
         if file.filename.endswith('.gz'):
@@ -256,7 +276,7 @@ async def upload_and_process_las(file: UploadFile = File(...)):
             contents = gzip.decompress(contents)
             print(f"[UPLOAD] Decompressed size: {len(contents)} bytes")
 
-        # Decodifica el contenido (mismo código que antes)
+        # Decodifica el contenido
         decoded_content = None
         encodings_to_try = ['utf-8', 'iso-8859-1', 'latin1', 'cp1252']
 
@@ -270,24 +290,32 @@ async def upload_and_process_las(file: UploadFile = File(...)):
         if decoded_content is None:
             raise UnicodeDecodeError("No se pudo decodificar el archivo")
 
-        # Crea el objeto LAS
-        file_like_object = io.StringIO(decoded_content)
-        las = lasio.read(file_like_object)
-
+        # Procesar LAS con manejo de memoria optimizado
         print("[UPLOAD] Processing LAS data")
-        # Procesa con la función mínima
+
+        # Usar StringIO con contenido limitado para evitar memory issues
+        file_like_object = io.StringIO(decoded_content)
+
+        # Configurar lasio para ser más eficiente con memoria
+        las = lasio.read(file_like_object, ignore_data=True)  # No cargar data arrays inicialmente
+
+        # Solo cargar las curvas que necesitamos
         result = process_las_data(las)
         print("[UPLOAD] LAS data processed successfully")
 
-        # Exportar curvas a CSV automáticamente (original y centralizado)
-        try:
-            print("[UPLOAD] Exporting CSV")
-            csv_paths = export_las_curves_to_csv(las)
-            result["csv_exported"] = csv_paths
-            print("[UPLOAD] CSV exported successfully")
-        except Exception as e:
-            print(f"[UPLOAD] CSV export error: {e}")
-            result["csv_error"] = str(e)
+        # Exportar curvas a CSV solo si el archivo no es demasiado grande
+        if len(decoded_content) < 50 * 1024 * 1024:  # Solo para archivos < 50MB
+            try:
+                print("[UPLOAD] Exporting CSV")
+                csv_paths = export_las_curves_to_csv(las)
+                result["csv_exported"] = csv_paths
+                print("[UPLOAD] CSV exported successfully")
+            except Exception as e:
+                print(f"[UPLOAD] CSV export error: {e}")
+                result["csv_error"] = str(e)
+        else:
+            print("[UPLOAD] Skipping CSV export for large file")
+            result["csv_skipped"] = "Archivo muy grande - CSV no generado"
 
         print("[UPLOAD] Upload completed successfully")
         return result

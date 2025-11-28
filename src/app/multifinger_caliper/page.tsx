@@ -977,177 +977,92 @@ export default function MultifingerCaliperPage() {
       });
       setUploadProgress(0);
 
-      try {
-        // Paso 1: Obtener URL presigned para subir a R2
-        console.log("Obteniendo URL presigned...");
-        const uploadUrlResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/get-upload-url", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            filename: file.name,
-            content_type: file.type || "application/octet-stream"
-          }),
-        });
+      // Usar XMLHttpRequest para tener progreso real de subida
+      const xhr = new XMLHttpRequest();
 
-        if (!uploadUrlResponse.ok) {
-          const errorData = await uploadUrlResponse.json();
-          throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al obtener URL de subida");
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setUploadProgress(Math.round(percentComplete));
         }
+      };
 
-        const uploadData = await uploadUrlResponse.json();
-        console.log("URL presigned obtenida:", uploadData);
+      xhr.onload = async () => {
+        if (xhr.status === 200) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            console.log("Respuesta del backend:", data);
 
-        // Paso 2: Subir archivo directamente a R2 con progreso
-        console.log("Subiendo archivo a R2...");
-        setUploadProgress(10);
+            if (data.detail && data.detail.startsWith("ERROR:")) {
+              throw new Error(data.detail.replace("ERROR: ", ""));
+            }
 
-        const xhr = new XMLHttpRequest();
+            // Count number of fingers (R curves)
+            const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+            const numFingers = rCurves.length;
 
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 90 + 10; // 10-100%
-            setUploadProgress(Math.round(percentComplete));
-          }
-        };
-
-        xhr.onload = async () => {
-          if (xhr.status === 200) {
-            console.log("Archivo subido a R2 exitosamente");
-            setUploadProgress(100);
-
-            // Paso 3: Procesar archivo desde R2
-            await processFileFromR2(uploadData.file_key);
-          } else {
-            console.error("Upload failed with status:", xhr.status);
             updateState({
-              error: "Error al subir archivo a R2",
+              fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+              fileLoaded: true,
+              isProcessed: false,
+              isLoading: false
+            });
+
+          } catch (err: any) {
+            console.error("Error parsing response:", err);
+            updateState({
+              error: err.message || "Error al procesar la respuesta del servidor",
               fileLoaded: false,
               isLoading: false
             });
           }
-        };
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            updateState({
+              error: errorData.detail?.replace("ERROR: ", "") || "Error al procesar el archivo",
+              fileLoaded: false,
+              isLoading: false
+            });
+          } catch {
+            updateState({
+              error: "Error desconocido del servidor",
+              fileLoaded: false,
+              isLoading: false
+            });
+          }
+        }
+      };
 
-        xhr.onerror = () => {
-          console.error("Upload failed");
-          updateState({
-            error: "Error de conexión al subir el archivo",
-            fileLoaded: false,
-            isLoading: false
-          });
-        };
-
-        xhr.ontimeout = () => {
-          console.error("Upload timeout");
-          updateState({
-            error: "Timeout al subir el archivo (demasiado grande)",
-            fileLoaded: false,
-            isLoading: false
-          });
-        };
-
-        // Configurar la petición a R2
-        xhr.open("PUT", uploadData.upload_url);
-        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        xhr.timeout = 900000; // 15 minutes
-        xhr.send(file);
-
-      } catch (err: any) {
-        console.error("Error in upload process:", err);
+      xhr.onerror = () => {
+        console.error("Upload failed");
         updateState({
-          error: err.message || "Error al procesar la subida del archivo",
+          error: "Error de conexión al subir el archivo",
           fileLoaded: false,
           isLoading: false
         });
-      }
+      };
+
+      xhr.ontimeout = () => {
+        console.error("Upload timeout");
+        updateState({
+          error: "Timeout al subir el archivo (demasiado grande)",
+          fileLoaded: false,
+          isLoading: false
+        });
+      };
+
+      // Configurar la petición
+      xhr.open("POST", "https://studio-2lx4.onrender.com/api/multifinger-caliper/upload");
+      xhr.timeout = 900000; // 15 minutes
+
+      // Crear FormData y enviar
+      const formData = new FormData();
+      formData.append("file", file);
+      xhr.send(formData);
     }
   };
 
-  // Función para procesar archivo desde R2 con progreso real
-  const processFileFromR2 = async (fileKey: string) => {
-    try {
-      console.log("Procesando archivo desde R2...");
-
-      // Iniciar procesamiento
-      const processResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-from-r2", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          file_key: fileKey,
-          use_centralized: true
-        }),
-      });
-
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al iniciar procesamiento");
-      }
-
-      // Hacer polling al progreso mientras se procesa
-      let pollAttempts = 0;
-      const maxAttempts = 300; // 5 minutes max (300 seconds)
-
-      const pollInterval = setInterval(async () => {
-        try {
-          pollAttempts++;
-          const progressResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/progress");
-
-          if (progressResponse.ok) {
-            const progressData = await progressResponse.json();
-            setProcessProgress(progressData.progress);
-
-            if (progressData.progress >= 100) {
-              // Procesamiento completo - marcar como listo
-              clearInterval(pollInterval);
-              console.log("Procesamiento completado exitosamente");
-              updateState({
-                fileInfo: `File processed successfully from R2. File key: ${fileKey}`,
-                fileLoaded: true,
-                isProcessed: false,
-                isLoading: false
-              });
-            } else if (progressData.progress < 0 || pollAttempts >= maxAttempts) {
-              // Error en procesamiento o timeout
-              clearInterval(pollInterval);
-              updateState({
-                error: progressData.progress < 0 ? "Error while file processing" : "Timeout",
-                fileLoaded: false,
-                isLoading: false
-              });
-            }
-            // Si progress >= 0 y < 100, continuar polling
-          } else {
-            // Error al consultar progreso
-            clearInterval(pollInterval);
-            updateState({
-              error: "Error al consultar el progreso del procesamiento",
-              fileLoaded: false,
-              isLoading: false
-            });
-          }
-        } catch (err) {
-          console.error("Error polling progress:", err);
-          clearInterval(pollInterval);
-          updateState({
-            error: "Error de conexión al consultar progreso",
-            fileLoaded: false,
-            isLoading: false
-          });
-        }
-      }, 1000); // Poll every second
-
-    } catch (err: any) {
-      console.error("Error starting processing:", err);
-      updateState({
-        error: err.message || "Error al procesar el archivo",
-        fileLoaded: false,
-        isLoading: false
-      });
-    }
-  };
 
 
   // Función para manejar el botón "Process Data" con progreso real
