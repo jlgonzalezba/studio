@@ -960,7 +960,7 @@ export default function MultifingerCaliperPage() {
   };
 
   // Función que se ejecuta cuando el usuario selecciona un archivo
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       console.log("Archivo seleccionado:", file.name);
@@ -977,70 +977,90 @@ export default function MultifingerCaliperPage() {
       });
       setUploadProgress(0);
 
-      // Usar XMLHttpRequest para tener progreso real de subida
-      const xhr = new XMLHttpRequest();
+      try {
+        // Paso 1: Obtener URL presigned para subir a R2
+        console.log("Obteniendo URL presigned...");
+        const uploadUrlResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/get-upload-url", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filename: file.name,
+            content_type: file.type || "application/octet-stream"
+          }),
+        });
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          setUploadProgress(Math.round(percentComplete));
+        if (!uploadUrlResponse.ok) {
+          const errorData = await uploadUrlResponse.json();
+          throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al obtener URL de subida");
         }
-      };
 
-      xhr.onload = async () => {
-        if (xhr.status === 200) {
-          try {
-            const uploadData = JSON.parse(xhr.responseText);
-            console.log("Archivo subido exitosamente:", uploadData);
+        const uploadData = await uploadUrlResponse.json();
+        console.log("URL presigned obtenida:", uploadData);
+
+        // Paso 2: Subir archivo directamente a R2 con progreso
+        console.log("Subiendo archivo a R2...");
+        setUploadProgress(10);
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 90 + 10; // 10-100%
+            setUploadProgress(Math.round(percentComplete));
+          }
+        };
+
+        xhr.onload = async () => {
+          if (xhr.status === 200) {
+            console.log("Archivo subido a R2 exitosamente");
             setUploadProgress(100);
 
-            // Paso 2: Procesar archivo desde R2 con progreso real
+            // Paso 3: Procesar archivo desde R2
             await processFileFromR2(uploadData.file_key);
-
-          } catch (err: any) {
-            console.error("Error parsing upload response:", err);
+          } else {
+            console.error("Upload failed with status:", xhr.status);
             updateState({
-              error: "Error al procesar la respuesta del servidor",
+              error: "Error al subir archivo a R2",
               fileLoaded: false,
               isLoading: false
             });
           }
-        } else {
-          try {
-            const errorData = JSON.parse(xhr.responseText);
-            throw new Error(errorData.detail?.replace("ERROR: ", "") || "Error al subir archivo");
-          } catch {
-            throw new Error("Error al subir archivo");
-          }
-        }
-      };
+        };
 
-      xhr.onerror = () => {
-        console.error("Upload failed");
+        xhr.onerror = () => {
+          console.error("Upload failed");
+          updateState({
+            error: "Error de conexión al subir el archivo",
+            fileLoaded: false,
+            isLoading: false
+          });
+        };
+
+        xhr.ontimeout = () => {
+          console.error("Upload timeout");
+          updateState({
+            error: "Timeout al subir el archivo (demasiado grande)",
+            fileLoaded: false,
+            isLoading: false
+          });
+        };
+
+        // Configurar la petición a R2
+        xhr.open("PUT", uploadData.upload_url);
+        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+        xhr.timeout = 900000; // 15 minutes
+        xhr.send(file);
+
+      } catch (err: any) {
+        console.error("Error in upload process:", err);
         updateState({
-          error: "Error de conexión al subir el archivo",
+          error: err.message || "Error al procesar la subida del archivo",
           fileLoaded: false,
           isLoading: false
         });
-      };
-
-      xhr.ontimeout = () => {
-        console.error("Upload timeout");
-        updateState({
-          error: "Timeout al subir el archivo (demasiado grande)",
-          fileLoaded: false,
-          isLoading: false
-        });
-      };
-
-      // Configurar la petición
-      xhr.open("POST", "https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-via-proxy");
-      xhr.timeout = 900000; // 15 minutes
-
-      // Crear FormData y enviar
-      const formData = new FormData();
-      formData.append("file", file);
-      xhr.send(formData);
+      }
     }
   };
 
