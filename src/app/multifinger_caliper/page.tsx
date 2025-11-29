@@ -669,8 +669,9 @@ const HTML5CanvasPlot = ({
 
     if (selection.start) {
       setSelection(prev => prev.start ? {start: prev.start, end: {x, y}} : prev);
-      setTooltip(null);
-    } else if (data && data.plot_data) {
+    }
+
+    if (data && data.plot_data) {
       const visibleDepthMin = zoomState.minDepth ?? Math.min(...data.plot_data.depth);
       const visibleDepthMax = zoomState.maxDepth ?? Math.max(...data.plot_data.depth);
       const depth = visibleDepthMin + ((y - 15) / 535) * (visibleDepthMax - visibleDepthMin);
@@ -701,7 +702,9 @@ const HTML5CanvasPlot = ({
       const grVal = grKey && grData[grKey] ? grData[grKey][closest.i] : null;
       const tempVal = tempKey && tempData[tempKey] ? tempData[tempKey][closest.i] : null;
 
-      setTooltip({show: true, x, y, depth: closest.d, min: minVal, max: maxVal, avg: avgVal, gr: grVal, temp: tempVal});
+      if (!selection.start) {
+        setTooltip({show: true, x, y, depth: closest.d, min: minVal, max: maxVal, avg: avgVal, gr: grVal, temp: tempVal});
+      }
       setCurrentDepth(closest.d);
     }
   };
@@ -764,6 +767,11 @@ const HTML5CanvasPlot = ({
     e.preventDefault();
   };
 
+  const handleThumbTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    e.preventDefault();
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
@@ -779,14 +787,35 @@ const HTML5CanvasPlot = ({
 
     const handleMouseUp = () => setIsDragging(false);
 
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        if (!touch) return;
+        const rect = mountRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const relativeY = touch.clientY - rect.top;
+        const newTop = Math.max(15, Math.min(550, relativeY - 25));
+        setThumbTop(newTop);
+        const position = ((newTop - 15) / 535) * 100;
+        handleScrollChange(position);
+      }
+    };
+
+    const handleTouchEnd = () => setIsDragging(false);
+
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [isDragging, data, zoomState]);
 
@@ -844,6 +873,7 @@ const HTML5CanvasPlot = ({
               transition: 'background 0.2s'
             }}
             onMouseDown={handleThumbMouseDown}
+            onTouchStart={handleThumbTouchStart}
             onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(to bottom, #777, #555)'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(to bottom, #666, #444)'}
           />
