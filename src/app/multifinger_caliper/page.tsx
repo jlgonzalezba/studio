@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// HTML5 Canvas Plot Componentfd fsd
+// HTML5 Canvas Plot Componentfd fsdaaa
 const HTML5CanvasPlot = ({
   data,
   setCurrentDepth,
