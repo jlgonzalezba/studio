@@ -6,20 +6,10 @@ Handles LAS file processing and analysis for multifinger caliper applications.
 import io
 import lasio
 import gzip
-import uuid
-import boto3
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
 class ProcessCaliperRequest(BaseModel):
-    use_centralized: bool = True
-
-class GetUploadUrlRequest(BaseModel):
-    filename: str
-    content_type: str = "application/octet-stream"
-
-class ProcessFromR2Request(BaseModel):
-    file_key: str
     use_centralized: bool = True
 
 # Import LAS processing module
@@ -28,247 +18,27 @@ from .las_processor import process_las_data, export_las_curves_to_csv
 # Import data management module
 from .df_manage import process_caliper_data
 
-# Import configuration
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import (
-    R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID,
-    R2_BUCKET_NAME, R2_REGION, R2_ENDPOINT, MAX_FILE_SIZE
-)
-
 # Create router for multifinger caliper endpoints
 router = APIRouter(prefix="/api/multifinger-caliper", tags=["multifinger-caliper"])
 
 # Global progress variable for processing
 processing_progress = 0
 
-# Global storage for processing results (in production, use a database)
-processing_results = {}
-
-# Initialize R2 client
-def get_r2_client():
-    return boto3.client(
-        's3',
-        endpoint_url=R2_ENDPOINT,
-        aws_access_key_id=R2_ACCESS_KEY_ID,
-        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-        region_name=R2_REGION
-    )
-
-@router.post("/get-upload-url")
-async def get_upload_url(request: GetUploadUrlRequest):
-    """
-    Generate a presigned URL for uploading files directly to Cloudflare R2.
-    Returns the presigned URL and the file key for later processing.
-    """
-    try:
-        # Validate file extension
-        if not any(request.filename.lower().endswith(ext) for ext in ['.las', '.gz']):
-            raise HTTPException(status_code=400, detail="ERROR: Only .las and .gz files are allowed")
-
-        # Generate unique file key
-        file_extension = '.las' if not request.filename.lower().endswith('.gz') else '.las.gz'
-        unique_id = str(uuid.uuid4())
-        file_key = f"uploads/{unique_id}_{request.filename}"
-
-        # Create presigned URL
-        s3_client = get_r2_client()
-        presigned_url = s3_client.generate_presigned_url(
-            'put_object',
-            Params={
-                'Bucket': R2_BUCKET_NAME,
-                'Key': file_key,
-                'ContentType': request.content_type
-            },
-            ExpiresIn=3600  # 1 hour
-        )
-
-        return {
-            "upload_url": presigned_url,
-            "file_key": file_key,
-            "expires_in": 3600
-        }
-
-    except Exception as e:
-        print(f"[GET-UPLOAD-URL] Error: {e}")
-        raise HTTPException(status_code=500, detail=f"ERROR: Failed to generate upload URL - {str(e)}")
-
-@router.post("/upload-via-proxy")
-async def upload_via_proxy(file: UploadFile = File(...)):
-    """
-    Proxy endpoint: receives file from frontend and uploads it to R2.
-    Returns the file_key for later processing.
-    """
-    try:
-        # Validate file extension
-        if not file.filename or not any(file.filename.lower().endswith(ext) for ext in ['.las', '.gz']):
-            raise HTTPException(status_code=400, detail="ERROR: Only .las and .gz files are allowed")
-
-        # Generate unique file key
-        file_extension = '.las' if not file.filename.lower().endswith('.gz') else '.las.gz'
-        unique_id = str(uuid.uuid4())
-        file_key = f"uploads/{unique_id}_{file.filename}"
-
-        print(f"[UPLOAD-PROXY] Uploading file {file.filename} to R2 key: {file_key}")
-
-        # Upload file to R2
-        s3_client = get_r2_client()
-
-        # Read file in chunks to avoid memory issues
-        file_content = await file.read()
-        if len(file_content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"ERROR: File too large. Maximum size is {MAX_FILE_SIZE} bytes")
-
-        s3_client.put_object(
-            Bucket=R2_BUCKET_NAME,
-            Key=file_key,
-            Body=file_content,
-            ContentType=file.content_type or "application/octet-stream"
-        )
-
-        print(f"[UPLOAD-PROXY] Successfully uploaded {len(file_content)} bytes to R2")
-        return {
-            "file_key": file_key,
-            "message": "File uploaded successfully"
-        }
-
-    except Exception as e:
-        print(f"[UPLOAD-PROXY] Error: {e}")
-        raise HTTPException(status_code=500, detail=f"ERROR: Failed to upload file - {str(e)}")
-
-@router.post("/process-from-r2")
-async def process_from_r2(request: ProcessFromR2Request):
-    """
-    Download and process a file from Cloudflare R2 with progress tracking.
-    """
-    global processing_progress, processing_results
-
-    try:
-        print(f"[PROCESS-R2] Starting processing for file_key: {request.file_key}")
-        processing_progress = 0
-
-        # Download file from R2
-        s3_client = get_r2_client()
-        processing_progress = 10
-        response = s3_client.get_object(Bucket=R2_BUCKET_NAME, Key=request.file_key)
-        file_content = response['Body'].read()
-
-        print(f"[PROCESS-R2] Downloaded file size: {len(file_content)} bytes")
-        processing_progress = 20
-
-        # Validate file size
-        if len(file_content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"ERROR: File too large. Maximum size is {MAX_FILE_SIZE} bytes")
-
-        # Decompress if .gz
-        if request.file_key.endswith('.gz'):
-            print("[PROCESS-R2] Decompressing .gz file")
-            file_content = gzip.decompress(file_content)
-            print(f"[PROCESS-R2] Decompressed size: {len(file_content)} bytes")
-
-        processing_progress = 30
-
-        # Decode content
-        decoded_content = None
-        encodings_to_try = ['utf-8', 'iso-8859-1', 'latin1', 'cp1252']
-
-        for encoding in encodings_to_try:
-            try:
-                decoded_content = file_content.decode(encoding)
-                break
-            except UnicodeDecodeError:
-                continue
-
-        if decoded_content is None:
-            raise UnicodeDecodeError("No se pudo decodificar el archivo")
-
-        processing_progress = 40
-
-        # Process LAS file
-        print("[PROCESS-R2] Processing LAS data")
-        file_like_object = io.StringIO(decoded_content)
-        las = lasio.read(file_like_object)
-
-        processing_progress = 60
-        result = process_las_data(las)
-        print("[PROCESS-R2] LAS data processed successfully")
-
-        processing_progress = 80
-
-        # Export curves to CSV
-        try:
-            print("[PROCESS-R2] Exporting CSV")
-            csv_paths = export_las_curves_to_csv(las)
-            result["csv_exported"] = csv_paths
-            print("[PROCESS-R2] CSV exported successfully")
-        except Exception as e:
-            print(f"[PROCESS-R2] CSV export error: {e}")
-            result["csv_error"] = str(e)
-
-        processing_progress = 100
-
-        # Store results for later retrieval
-        processing_results[request.file_key] = result
-
-        print("[PROCESS-R2] Processing completed successfully")
-        return {"status": "completed", "file_key": request.file_key, "message": "Processing completed"}
-
-    except UnicodeDecodeError as e:
-        print(f"[PROCESS-R2] Unicode decode error: {e}")
-        processing_progress = -1  # Error state
-        raise HTTPException(status_code=400, detail="ERROR: El archivo .las debe estar en formato UTF-8. Convierta el archivo a UTF-8 e intente nuevamente.")
-    except ValueError as e:
-        print(f"[PROCESS-R2] Value error: {e}")
-        processing_progress = -1
-        if "LAS" in str(e):
-            raise HTTPException(status_code=400, detail=f"ERROR: Formato LAS inválido - {str(e)}")
-        raise HTTPException(status_code=400, detail=f"ERROR: Datos inválidos en el archivo - {str(e)}")
-    except Exception as e:
-        print(f"[PROCESS-R2] General error: {e}")
-        processing_progress = -1
-        error_msg = str(e)
-        if "No curves" in error_msg or "empty" in error_msg.lower():
-            raise HTTPException(status_code=400, detail="ERROR: El archivo .las no contiene curvas válidas o está vacío.")
-        elif "version" in error_msg.lower():
-            raise HTTPException(status_code=400, detail="ERROR: Versión LAS no soportada. Solo se soporta LAS 2.0.")
-        else:
-            raise HTTPException(status_code=500, detail=f"ERROR: Error al procesar el archivo - {error_msg}")
 
 @router.post("/upload")
 async def upload_and_process_las(file: UploadFile = File(...)):
     """
     Endpoint para recibir un archivo .las, procesarlo con lasio y
     devolver información específica para multifinger caliper.
-    Usa streaming para archivos grandes.
     """
-    if not (file.filename.endswith('.las') or file.filename.endswith('.las.gz')):
-        raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las o .las.gz")
+    if not file.filename.endswith('.las'):
+        raise HTTPException(status_code=400, detail="ERROR: El archivo debe tener la extensión .las")
 
     try:
         print(f"[UPLOAD] Received file: {file.filename}")
-
-        # Para archivos grandes, usar procesamiento por chunks
-        file_size = 0
-        chunks = []
-
-        # Leer en chunks para evitar cargar archivos grandes en memoria
-        chunk_size = 8192  # 8KB chunks
-        while True:
-            chunk = await file.read(chunk_size)
-            if not chunk:
-                break
-            chunks.append(chunk)
-            file_size += len(chunk)
-
-            # Límite de seguridad: 500MB máximo
-            if file_size > 500 * 1024 * 1024:
-                raise HTTPException(status_code=400, detail="ERROR: Archivo demasiado grande (máximo 500MB)")
-
-        print(f"[UPLOAD] File size: {file_size} bytes")
-
-        # Unir chunks
-        contents = b''.join(chunks)
+        # Lee el contenido del archivo subido en memoria
+        contents = await file.read()
+        print(f"[UPLOAD] File size: {len(contents)} bytes")
 
         # Descomprimir si es .gz
         if file.filename.endswith('.gz'):
@@ -276,7 +46,7 @@ async def upload_and_process_las(file: UploadFile = File(...)):
             contents = gzip.decompress(contents)
             print(f"[UPLOAD] Decompressed size: {len(contents)} bytes")
 
-        # Decodifica el contenido
+        # Decodifica el contenido (mismo código que antes)
         decoded_content = None
         encodings_to_try = ['utf-8', 'iso-8859-1', 'latin1', 'cp1252']
 
@@ -290,32 +60,24 @@ async def upload_and_process_las(file: UploadFile = File(...)):
         if decoded_content is None:
             raise UnicodeDecodeError("No se pudo decodificar el archivo")
 
-        # Procesar LAS con manejo de memoria optimizado
-        print("[UPLOAD] Processing LAS data")
-
-        # Usar StringIO con contenido limitado para evitar memory issues
+        # Crea el objeto LAS
         file_like_object = io.StringIO(decoded_content)
+        las = lasio.read(file_like_object)
 
-        # Configurar lasio para ser más eficiente con memoria
-        las = lasio.read(file_like_object, ignore_data=True)  # No cargar data arrays inicialmente
-
-        # Solo cargar las curvas que necesitamos
+        print("[UPLOAD] Processing LAS data")
+        # Procesa con la función mínima
         result = process_las_data(las)
         print("[UPLOAD] LAS data processed successfully")
 
-        # Exportar curvas a CSV solo si el archivo no es demasiado grande
-        if len(decoded_content) < 50 * 1024 * 1024:  # Solo para archivos < 50MB
-            try:
-                print("[UPLOAD] Exporting CSV")
-                csv_paths = export_las_curves_to_csv(las)
-                result["csv_exported"] = csv_paths
-                print("[UPLOAD] CSV exported successfully")
-            except Exception as e:
-                print(f"[UPLOAD] CSV export error: {e}")
-                result["csv_error"] = str(e)
-        else:
-            print("[UPLOAD] Skipping CSV export for large file")
-            result["csv_skipped"] = "Archivo muy grande - CSV no generado"
+        # Exportar curvas a CSV automáticamente (original y centralizado)
+        try:
+            print("[UPLOAD] Exporting CSV")
+            csv_paths = export_las_curves_to_csv(las)
+            result["csv_exported"] = csv_paths
+            print("[UPLOAD] CSV exported successfully")
+        except Exception as e:
+            print(f"[UPLOAD] CSV export error: {e}")
+            result["csv_error"] = str(e)
 
         print("[UPLOAD] Upload completed successfully")
         return result
@@ -377,18 +139,6 @@ async def get_progress():
     Get current processing progress.
     """
     return {"progress": processing_progress}
-
-@router.get("/processing-results/{file_key}")
-async def get_processing_results(file_key: str):
-    """
-    Get processing results for a specific file key.
-    """
-    global processing_results
-
-    if file_key in processing_results:
-        return processing_results[file_key]
-    else:
-        raise HTTPException(status_code=404, detail="Processing results not found. Processing may not be complete yet.")
 
 @router.get("/health")
 async def health_check():

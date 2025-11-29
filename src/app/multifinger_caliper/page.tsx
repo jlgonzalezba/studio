@@ -60,24 +60,6 @@ const HTML5CanvasPlot = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Prevent infinite re-renders by checking if data actually changed
-    const dataSignature = JSON.stringify({
-      depthLength: data.plot_data.depth?.length,
-      minDiameterLength: data.plot_data.min_diameter?.length,
-      maxDiameterLength: data.plot_data.max_diameter?.length,
-      avgDiameterLength: data.plot_data.avg_diameter?.length,
-      zoomMinDepth: zoomState.minDepth,
-      zoomMaxDepth: zoomState.maxDepth,
-      showFingerReadings,
-      showCollars
-    });
-
-    // Use a ref to store the last signature and prevent unnecessary re-renders
-    if (canvas.dataset.lastDataSignature === dataSignature) {
-      return;
-    }
-    canvas.dataset.lastDataSignature = dataSignature;
-
     const { plot_data, raw_data } = data;
 
     // Clear canvas
@@ -345,168 +327,169 @@ const HTML5CanvasPlot = ({
       ctx.fillRect(10, startY, 580, endY - startY);
     }
 
-    // Add HTML labels - only if container exists and is empty
+    // Add HTML labels
     if (mountRef.current) {
-      const existingLabels = mountRef.current.querySelectorAll('.plot-label');
-      if (existingLabels.length === 0) { // Only create labels if they don't exist
-        // Y axis labels (depth)
-        for (let i = 0; i <= 10; i++) {
-          const depthValue = visibleDepthMin + (i / 10) * (visibleDepthMax - visibleDepthMin);
-          const label = document.createElement('div');
-          label.className = 'plot-label';
-          label.textContent = depthValue.toFixed(0);
-          label.style.position = 'absolute';
-          label.style.left = '-40px';
-          label.style.width = '35px';
-          label.style.textAlign = 'right';
-          const y = 15 + (i / 10) * 535;
-          const topPosition = y;
-          label.style.top = `${topPosition}px`;
-          label.style.transform = 'translateY(-50%)';
-          label.style.fontSize = '10px';
-          label.style.color = 'black';
-          label.style.pointerEvents = 'none';
-          mountRef.current.appendChild(label);
-        }
+      // Clear previous labels
+      const labels = mountRef.current.querySelectorAll('.plot-label');
+      labels.forEach(label => label.remove());
 
-        // X axis labels (diameter) - use custom scale if enabled
-        const displayMinDiam = useCustomScale ? customMinDiam : diamMin;
-        const displayMaxDiam = useCustomScale ? customMaxDiam : diamMax;
-        for (let i = 0; i <= 5; i++) {
-          const diamValue = displayMinDiam + (i / 5) * (displayMaxDiam - displayMinDiam);
-          const label = document.createElement('div');
-          label.className = 'plot-label';
-          label.textContent = diamValue.toFixed(2) + '"';
-          label.style.position = 'absolute';
-          label.style.bottom = '5px';
-          const leftPosition = 10 + (i / 5) * 380;
-          label.style.left = `${leftPosition}px`;
-          label.style.transform = 'translateX(-50%)';
-          label.style.fontSize = '10px';
-          label.style.color = 'black';
-          label.style.pointerEvents = 'none';
-          mountRef.current.appendChild(label);
-        }
-
-        // GR X axis labels (only min and max)
-        for (let i of [0, 5]) {
-          const grValue = grMin + (i / 5) * (grMax - grMin);
-          const label = document.createElement('div');
-          label.className = 'plot-label';
-          label.textContent = Math.round(grValue).toString();
-          label.style.position = 'absolute';
-          label.style.bottom = '5px';
-          const leftPosition = 410 + (i / 5) * 80;
-          label.style.left = `${leftPosition}px`;
-          label.style.transform = 'translateX(-50%)';
-          label.style.fontSize = '10px';
-          label.style.color = 'black';
-          label.style.pointerEvents = 'none';
-          mountRef.current.appendChild(label);
-        }
-
-        // Temp X axis labels (only min and max)
-        for (let i of [0, 5]) {
-          const tempValue = tempMin + (i / 5) * (tempMax - tempMin);
-          const label = document.createElement('div');
-          label.className = 'plot-label';
-          label.textContent = Math.round(tempValue).toString();
-          label.style.position = 'absolute';
-          label.style.bottom = '5px';
-          const leftPosition = 510 + (i / 5) * 80;
-          label.style.left = `${leftPosition}px`;
-          label.style.transform = 'translateX(-50%)';
-          label.style.fontSize = '10px';
-          label.style.color = 'black';
-          label.style.pointerEvents = 'none';
-          mountRef.current.appendChild(label);
-        }
-
-        // Finger readings axis labels if enabled
-        if (showFingerReadings && raw_data.r_curves && raw_data.r_curves.length > 0) {
-          const numFingers = raw_data.r_curves[0]?.length || 0;
-
-          // Finger readings title
-          const fingerTitle = document.createElement('div');
-          fingerTitle.className = 'plot-label';
-          fingerTitle.textContent = 'Finger Readings (R01-R' + numFingers.toString().padStart(2, '0') + ')';
-          fingerTitle.style.position = 'absolute';
-          fingerTitle.style.bottom = '-35px';
-          fingerTitle.style.left = '745px';
-          fingerTitle.style.transform = 'translateX(-50%)';
-          fingerTitle.style.fontSize = '12px';
-          fingerTitle.style.color = 'black';
-          fingerTitle.style.pointerEvents = 'none';
-          mountRef.current.appendChild(fingerTitle);
-
-          // Finger number labels
-          for (let i = 0; i <= numFingers; i += Math.max(1, Math.floor(numFingers / 5))) {
-            const fingerNum = i + 1;
-            const label = document.createElement('div');
-            label.className = 'plot-label';
-            label.textContent = 'R' + fingerNum.toString().padStart(2, '0');
-            label.style.position = 'absolute';
-            label.style.bottom = '5px';
-            const leftPosition = 620 + (i / numFingers) * 260;
-            label.style.left = `${leftPosition}px`;
-            label.style.transform = 'translateX(-50%)';
-            label.style.fontSize = '8px';
-            label.style.color = 'black';
-            label.style.pointerEvents = 'none';
-            mountRef.current.appendChild(label);
-          }
-        }
-
-        // Axis titles
-        const xTitle = document.createElement('div');
-        xTitle.className = 'plot-label';
-        xTitle.textContent = 'Diameter (inches)';
-        xTitle.style.position = 'absolute';
-        xTitle.style.bottom = '-35px';
-        xTitle.style.left = '50%';
-        xTitle.style.transform = 'translateX(-50%)';
-        xTitle.style.fontSize = '12px';
-        xTitle.style.color = 'black';
-        xTitle.style.pointerEvents = 'none';
-        mountRef.current.appendChild(xTitle);
-
-        const grTitle = document.createElement('div');
-        grTitle.className = 'plot-label';
-        grTitle.textContent = 'GR (API)';
-        grTitle.style.position = 'absolute';
-        grTitle.style.bottom = '-35px';
-        grTitle.style.left = '450px';
-        grTitle.style.transform = 'translateX(-50%)';
-        grTitle.style.fontSize = '12px';
-        grTitle.style.color = 'black';
-        grTitle.style.pointerEvents = 'none';
-        mountRef.current.appendChild(grTitle);
-
-        const tempTitle = document.createElement('div');
-        tempTitle.className = 'plot-label';
-        tempTitle.textContent = 'Temp (°F)';
-        tempTitle.style.position = 'absolute';
-        tempTitle.style.bottom = '-35px';
-        tempTitle.style.left = '550px';
-        tempTitle.style.transform = 'translateX(-50%)';
-        tempTitle.style.fontSize = '12px';
-        tempTitle.style.color = 'black';
-        tempTitle.style.pointerEvents = 'none';
-        mountRef.current.appendChild(tempTitle);
-
-        const yTitle = document.createElement('div');
-        yTitle.className = 'plot-label';
-        yTitle.textContent = 'Depth (feet)';
-        yTitle.style.position = 'absolute';
-        yTitle.style.top = '50%';
-        yTitle.style.left = '-65px';
-        yTitle.style.transform = 'rotate(-90deg) translateY(-50%)';
-        yTitle.style.transformOrigin = 'left center';
-        yTitle.style.fontSize = '12px';
-        yTitle.style.color = 'black';
-        yTitle.style.pointerEvents = 'none';
-        mountRef.current.appendChild(yTitle);
+      // Y axis labels (depth)
+      for (let i = 0; i <= 10; i++) {
+        const depthValue = visibleDepthMin + (i / 10) * (visibleDepthMax - visibleDepthMin);
+        const label = document.createElement('div');
+        label.className = 'plot-label';
+        label.textContent = depthValue.toFixed(0);
+        label.style.position = 'absolute';
+        label.style.left = '-40px';
+        label.style.width = '35px';
+        label.style.textAlign = 'right';
+        const y = 15 + (i / 10) * 535;
+        const topPosition = y;
+        label.style.top = `${topPosition}px`;
+        label.style.transform = 'translateY(-50%)';
+        label.style.fontSize = '10px';
+        label.style.color = 'black';
+        label.style.pointerEvents = 'none';
+        mountRef.current.appendChild(label);
       }
+
+      // X axis labels (diameter) - use custom scale if enabled
+      const displayMinDiam = useCustomScale ? customMinDiam : diamMin;
+      const displayMaxDiam = useCustomScale ? customMaxDiam : diamMax;
+      for (let i = 0; i <= 5; i++) {
+        const diamValue = displayMinDiam + (i / 5) * (displayMaxDiam - displayMinDiam);
+        const label = document.createElement('div');
+        label.className = 'plot-label';
+        label.textContent = diamValue.toFixed(2) + '"';
+        label.style.position = 'absolute';
+        label.style.bottom = '5px';
+        const leftPosition = 10 + (i / 5) * 380;
+        label.style.left = `${leftPosition}px`;
+        label.style.transform = 'translateX(-50%)';
+        label.style.fontSize = '10px';
+        label.style.color = 'black';
+        label.style.pointerEvents = 'none';
+        mountRef.current.appendChild(label);
+      }
+
+      // GR X axis labels (only min and max)
+      for (let i of [0, 5]) {
+        const grValue = grMin + (i / 5) * (grMax - grMin);
+        const label = document.createElement('div');
+        label.className = 'plot-label';
+        label.textContent = Math.round(grValue).toString();
+        label.style.position = 'absolute';
+        label.style.bottom = '5px';
+        const leftPosition = 410 + (i / 5) * 80;
+        label.style.left = `${leftPosition}px`;
+        label.style.transform = 'translateX(-50%)';
+        label.style.fontSize = '10px';
+        label.style.color = 'black';
+        label.style.pointerEvents = 'none';
+        mountRef.current.appendChild(label);
+      }
+
+      // Temp X axis labels (only min and max)
+      for (let i of [0, 5]) {
+        const tempValue = tempMin + (i / 5) * (tempMax - tempMin);
+        const label = document.createElement('div');
+        label.className = 'plot-label';
+        label.textContent = Math.round(tempValue).toString();
+        label.style.position = 'absolute';
+        label.style.bottom = '5px';
+        const leftPosition = 510 + (i / 5) * 80;
+        label.style.left = `${leftPosition}px`;
+        label.style.transform = 'translateX(-50%)';
+        label.style.fontSize = '10px';
+        label.style.color = 'black';
+        label.style.pointerEvents = 'none';
+        mountRef.current.appendChild(label);
+      }
+
+      // Finger readings axis labels if enabled
+      if (showFingerReadings && raw_data.r_curves && raw_data.r_curves.length > 0) {
+        const numFingers = raw_data.r_curves[0]?.length || 0;
+
+        // Finger readings title
+        const fingerTitle = document.createElement('div');
+        fingerTitle.className = 'plot-label';
+        fingerTitle.textContent = 'Finger Readings (R01-R' + numFingers.toString().padStart(2, '0') + ')';
+        fingerTitle.style.position = 'absolute';
+        fingerTitle.style.bottom = '-35px';
+        fingerTitle.style.left = '745px';
+        fingerTitle.style.transform = 'translateX(-50%)';
+        fingerTitle.style.fontSize = '12px';
+        fingerTitle.style.color = 'black';
+        fingerTitle.style.pointerEvents = 'none';
+        mountRef.current.appendChild(fingerTitle);
+
+        // Finger number labels
+        for (let i = 0; i <= numFingers; i += Math.max(1, Math.floor(numFingers / 5))) {
+          const fingerNum = i + 1;
+          const label = document.createElement('div');
+          label.className = 'plot-label';
+          label.textContent = 'R' + fingerNum.toString().padStart(2, '0');
+          label.style.position = 'absolute';
+          label.style.bottom = '5px';
+          const leftPosition = 620 + (i / numFingers) * 260;
+          label.style.left = `${leftPosition}px`;
+          label.style.transform = 'translateX(-50%)';
+          label.style.fontSize = '8px';
+          label.style.color = 'black';
+          label.style.pointerEvents = 'none';
+          mountRef.current.appendChild(label);
+        }
+      }
+
+      // Axis titles
+      const xTitle = document.createElement('div');
+      xTitle.className = 'plot-label';
+      xTitle.textContent = 'Diameter (inches)';
+      xTitle.style.position = 'absolute';
+      xTitle.style.bottom = '-35px';
+      xTitle.style.left = '50%';
+      xTitle.style.transform = 'translateX(-50%)';
+      xTitle.style.fontSize = '12px';
+      xTitle.style.color = 'black';
+      xTitle.style.pointerEvents = 'none';
+      mountRef.current.appendChild(xTitle);
+
+      const grTitle = document.createElement('div');
+      grTitle.className = 'plot-label';
+      grTitle.textContent = 'GR (API)';
+      grTitle.style.position = 'absolute';
+      grTitle.style.bottom = '-35px';
+      grTitle.style.left = '450px';
+      grTitle.style.transform = 'translateX(-50%)';
+      grTitle.style.fontSize = '12px';
+      grTitle.style.color = 'black';
+      grTitle.style.pointerEvents = 'none';
+      mountRef.current.appendChild(grTitle);
+
+      const tempTitle = document.createElement('div');
+      tempTitle.className = 'plot-label';
+      tempTitle.textContent = 'Temp (°F)';
+      tempTitle.style.position = 'absolute';
+      tempTitle.style.bottom = '-35px';
+      tempTitle.style.left = '550px';
+      tempTitle.style.transform = 'translateX(-50%)';
+      tempTitle.style.fontSize = '12px';
+      tempTitle.style.color = 'black';
+      tempTitle.style.pointerEvents = 'none';
+      mountRef.current.appendChild(tempTitle);
+
+      const yTitle = document.createElement('div');
+      yTitle.className = 'plot-label';
+      yTitle.textContent = 'Depth (feet)';
+      yTitle.style.position = 'absolute';
+      yTitle.style.top = '50%';
+      yTitle.style.left = '-65px';
+      yTitle.style.transform = 'rotate(-90deg) translateY(-50%)';
+      yTitle.style.transformOrigin = 'left center';
+      yTitle.style.fontSize = '12px';
+      yTitle.style.color = 'black';
+      yTitle.style.pointerEvents = 'none';
+      mountRef.current.appendChild(yTitle);
     }
 
     // Draw horizontal tracking line
@@ -981,6 +964,7 @@ export default function MultifingerCaliperPage() {
     const file = event.target.files?.[0];
     if (file) {
       console.log("Archivo seleccionado:", file.name);
+      // Aquí es donde manejarías la lógica para leer o subir el archivo.
       updateState({
         isLoading: true,
         fileInfo: null,
@@ -994,127 +978,118 @@ export default function MultifingerCaliperPage() {
       });
       setUploadProgress(0);
 
-      // Usar XMLHttpRequest para tener progreso real de subida
-      const xhr = new XMLHttpRequest();
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          setUploadProgress(Math.round(percentComplete));
-        }
-      };
-
-      xhr.onload = async () => {
-        if (xhr.status === 200) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            console.log("Respuesta del backend:", data);
-
-            if (data.detail && data.detail.startsWith("ERROR:")) {
-              throw new Error(data.detail.replace("ERROR: ", ""));
-            }
-
-            // Count number of fingers (R curves)
-            const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-            const numFingers = rCurves.length;
-
-            updateState({
-              fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
-              fileLoaded: true,
-              isProcessed: false,
-              isLoading: false
-            });
-
-          } catch (err: any) {
-            console.error("Error parsing response:", err);
-            updateState({
-              error: err.message || "Error al procesar la respuesta del servidor",
-              fileLoaded: false,
-              isLoading: false
-            });
-          }
-        } else {
-          try {
-            const errorData = JSON.parse(xhr.responseText);
-            updateState({
-              error: errorData.detail?.replace("ERROR: ", "") || "Error al procesar el archivo",
-              fileLoaded: false,
-              isLoading: false
-            });
-          } catch {
-            updateState({
-              error: "Error desconocido del servidor",
-              fileLoaded: false,
-              isLoading: false
-            });
-          }
-        }
-      };
-
-      xhr.onerror = () => {
-        console.error("Upload failed");
-        updateState({
-          error: "Error de conexión al subir el archivo",
-          fileLoaded: false,
-          isLoading: false
-        });
-      };
-
-      xhr.ontimeout = () => {
-        console.error("Upload timeout");
-        updateState({
-          error: "Timeout al subir el archivo (demasiado grande)",
-          fileLoaded: false,
-          isLoading: false
-        });
-      };
-
-      // Configurar la petición
-      xhr.open("POST", "https://studio-2lx4.onrender.com/api/multifinger-caliper/upload");
-      xhr.timeout = 900000; // 15 minutes
-
-      // Crear FormData y enviar
       const formData = new FormData();
       formData.append("file", file);
-      xhr.send(formData);
+
+      try {
+        // Simular progreso de subida
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+          progress += Math.random() * 10 + 5; // Incremento aleatorio
+          if (progress >= 90) {
+            progress = 90;
+            clearInterval(progressInterval);
+          }
+          setUploadProgress(Math.round(progress));
+        }, 300);
+
+        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
+          method: "POST",
+          body: formData,
+          signal: AbortSignal.timeout(300000), // 5 minutes timeout
+        });
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        const data = await response.json();
+        console.log("Respuesta del backend:", data);
+
+        if (!response.ok) {
+          if (data.detail && data.detail.startsWith("ERROR:")) {
+            throw new Error(data.detail.replace("ERROR: ", ""));
+          }
+          throw new Error("Error al procesar el archivo en el backend.");
+        }
+
+        // Count number of fingers (R curves)
+        const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+        const numFingers = rCurves.length;
+
+        updateState({
+          fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+          fileLoaded: true,
+          isProcessed: false,
+          isLoading: false
+        });
+
+      } catch (err: any) {
+        console.error(err);
+        updateState({
+          error: "Could not connect to the backend or process the file. Make sure the Python server is running.",
+          fileLoaded: false
+        });
+      } finally {
+        updateState({ isLoading: false });
+      }
     }
   };
 
+  // Función para manejar el botón "Process Data"
+    const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
+      console.log("Procesando datos del caliper...");
+      updateState({ isProcessing: true, error: null });
+      setProcessProgress(0);
 
+     try {
+       // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
+       const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
 
-  // Función para manejar el botón "Process Data" con progreso real
-  const handleProcessData = async (event?: any, forceUseCentralized?: boolean) => {
-    console.log("Procesando datos del caliper...");
-    updateState({ isProcessing: true, error: null });
-    setProcessProgress(0);
+       // Simular progreso de procesamiento
+       let progress = 0;
+       const progressInterval = setInterval(() => {
+         progress += Math.random() * 15 + 5; // Incremento aleatorio
+         if (progress >= 95) {
+           progress = 95;
+           clearInterval(progressInterval);
+         }
+         setProcessProgress(Math.round(progress));
+       }, 400);
 
-    try {
-      // Usar el parámetro forzado si se proporciona, sino calcular del estado del toggle
-      const useCentralized = forceUseCentralized !== undefined ? forceUseCentralized : !isUncentralised;
+       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+         },
+         body: JSON.stringify({ use_centralized: useCentralized }),
+         signal: AbortSignal.timeout(300000), // 5 minutes timeout
+       });
 
-      // Iniciar procesamiento con el endpoint existente
-      const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ use_centralized: useCentralized }),
-        signal: AbortSignal.timeout(900000), // 15 minutes timeout
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.detail && errorData.detail.startsWith("ERROR:")) {
-          throw new Error(errorData.detail.replace("ERROR: ", ""));
-        }
-        throw new Error("Error al procesar los datos del caliper.");
-      }
+       clearInterval(progressInterval);
+       setProcessProgress(100);
 
       const data = await response.json();
       console.log("Respuesta del procesamiento:", data);
+      console.log("Full backend data:", JSON.stringify(data, null, 2));
+      console.log("Data structure:", {
+        hasPlotData: !!data.plot_data,
+        plotDataKeys: data.plot_data ? Object.keys(data.plot_data) : [],
+        depthLength: data.plot_data?.depth?.length,
+        minDiameterLength: data.plot_data?.min_diameter?.length,
+        maxDiameterLength: data.plot_data?.max_diameter?.length,
+        avgDiameterLength: data.plot_data?.avg_diameter?.length,
+        hasRawData: !!data.raw_data,
+        rawDataKeys: data.raw_data ? Object.keys(data.raw_data) : [],
+        rawDepthLength: data.raw_data?.depth?.length,
+        rawCurves: data.raw_data?.r_curves?.length
+      });
 
-      // Mostrar progreso completo
-      setProcessProgress(100);
+      if (!response.ok) {
+        if (data.detail && data.detail.startsWith("ERROR:")) {
+          throw new Error(data.detail.replace("ERROR: ", ""));
+        }
+        throw new Error("Error al procesar los datos del caliper.");
+      }
 
       updateState({ plotData: data, isProcessed: true });
       console.log("Datos del gráfico procesados correctamente");
@@ -1122,7 +1097,7 @@ export default function MultifingerCaliperPage() {
     } catch (err: any) {
       console.error("Error al procesar datos:", err);
       updateState({
-        error: err.message || "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
+        error: "Error processing caliper data. Make sure you have uploaded a valid LAS file.",
         plotData: null
       });
     } finally {
