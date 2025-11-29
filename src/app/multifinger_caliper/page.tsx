@@ -643,6 +643,102 @@ const HTML5CanvasPlot = ({
     setSelection({start: null, end: null});
   };
 
+  const handleTouchStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const touch = event.touches[0];
+    if (!touch) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    setSelection({start: {x, y}, end: {x, y}});
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const touch = event.touches[0];
+    if (!touch) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    setHorizontalLineY(y);
+
+    if (selection.start) {
+      setSelection(prev => prev.start ? {start: prev.start, end: {x, y}} : prev);
+      setTooltip(null);
+    } else if (data && data.plot_data) {
+      const visibleDepthMin = zoomState.minDepth ?? Math.min(...data.plot_data.depth);
+      const visibleDepthMax = zoomState.maxDepth ?? Math.max(...data.plot_data.depth);
+      const depth = visibleDepthMin + ((y - 15) / 535) * (visibleDepthMax - visibleDepthMin);
+
+      const visibleIndices = data.plot_data.depth.map((d: number, i: number) => ({d, i})).filter((item: {d: number, i: number}) => item.d >= visibleDepthMin && item.d <= visibleDepthMax);
+      if (visibleIndices.length === 0) return;
+
+      let closest = visibleIndices[0];
+      let minDiff = Math.abs(closest.d - depth);
+      for (let i = 1; i < visibleIndices.length; i++) {
+        const diff = Math.abs(visibleIndices[i].d - depth);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closest = visibleIndices[i];
+        }
+      }
+
+      const minVal = data.plot_data.min_diameter[closest.i];
+      const maxVal = data.plot_data.max_diameter[closest.i];
+      const avgVal = data.plot_data.avg_diameter[closest.i];
+
+      const grCurves = data.raw_data.gr_curves || [];
+      const tempCurves = data.raw_data.temp_curves || [];
+      const grData = data.raw_data.gr_data || {};
+      const tempData = data.raw_data.temp_data || {};
+      const grKey = grCurves[0];
+      const tempKey = tempCurves[0];
+      const grVal = grKey && grData[grKey] ? grData[grKey][closest.i] : null;
+      const tempVal = tempKey && tempData[tempKey] ? tempData[tempKey][closest.i] : null;
+
+      setTooltip({show: true, x, y, depth: closest.d, min: minVal, max: maxVal, avg: avgVal, gr: grVal, temp: tempVal});
+      setCurrentDepth(closest.d);
+    }
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    if (!selection.start || !selection.end) return;
+    const startY = Math.min(selection.start.y, selection.end.y);
+    const endY = Math.max(selection.start.y, selection.end.y);
+
+    if (!data || !data.plot_data) return;
+    const { plot_data } = data;
+    const depthMin = Math.min(...plot_data.depth);
+    const depthMax = Math.max(...plot_data.depth);
+    const visibleDepthMin = zoomState.minDepth ?? depthMin;
+    const visibleDepthMax = zoomState.maxDepth ?? depthMax;
+
+    if (Math.abs(endY - startY) > 10) {
+      const depthMinSel = visibleDepthMin + ((startY - 15) / 535) * (visibleDepthMax - visibleDepthMin);
+      const depthMaxSel = visibleDepthMin + ((endY - 15) / 535) * (visibleDepthMax - visibleDepthMin);
+
+      const totalRange = depthMax - depthMin;
+      const centerDepth = (depthMinSel + depthMaxSel) / 2;
+      const thumbPosition = 15 + ((centerDepth - depthMin) / totalRange) * 535;
+
+      setZoomState({
+        minDepth: depthMinSel,
+        maxDepth: depthMaxSel,
+        minDiam: null,
+        maxDiam: null
+      });
+
+      setThumbTop(Math.max(15, Math.min(550, thumbPosition)));
+    }
+    setSelection({start: null, end: null});
+  };
+
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     // Zoom with mouse wheel disabled
   };
@@ -708,6 +804,10 @@ const HTML5CanvasPlot = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => { setSelection({start: null, end: null}); setTooltip(null); setCurrentDepth(null); setHorizontalLineY(null); }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => { setSelection({start: null, end: null}); setTooltip(null); setCurrentDepth(null); setHorizontalLineY(null); }}
         style={{
           border: '3px solid #2F4F4F',
           borderRadius: '12px',
