@@ -7,6 +7,7 @@ import io
 import lasio
 import gzip
 import uuid
+import os
 import boto3
 from botocore.client import Config
 from fastapi import APIRouter, File, UploadFile, HTTPException
