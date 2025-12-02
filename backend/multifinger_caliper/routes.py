@@ -59,7 +59,9 @@ async def get_presigned_url(request: PresignedUrlRequest):
     """
     Generate a presigned URL for uploading a file directly to Cloudflare R2.
     """
-    print(f"R2_BUCKET_NAME: {R2_BUCKET_NAME}")
+    print(f"Environment variables: {list(os.environ.keys())}")
+    print(f"R2_BUCKET_NAME value: {repr(os.environ.get('R2_BUCKET_NAME'))}")
+
     if not R2_BUCKET_NAME:
         raise HTTPException(status_code=500, detail="R2 bucket not configured")
     

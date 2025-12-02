@@ -32,6 +32,7 @@ ALLOWED_EXTENSIONS = [".las", ".csv", ".txt"]
 
 # Cloudflare R2 Configuration
 import os
+PORT = int(os.getenv("PORT", 5000))
 R2_ACCOUNT_ID = os.getenv("b8535e30d92db719275627e13419d79a")
 R2_ACCESS_KEY_ID = os.getenv("dea0fdd18fef5a61e7852ea82eb7665d")
 R2_SECRET_ACCESS_KEY = os.getenv("83e2723133007494f48bd68b23b8989f4f612bb44dd8943ba1eedd87b8258600")
