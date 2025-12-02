@@ -982,25 +982,73 @@ export default function MultifingerCaliperPage() {
       formData.append("file", file);
 
       try {
-        // Simular progreso de subida
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-          progress += Math.random() * 10 + 5; // Incremento aleatorio
-          if (progress >= 90) {
-            progress = 90;
-            clearInterval(progressInterval);
-          }
-          setUploadProgress(Math.round(progress));
-        }, 300);
-
-        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload", {
+        // Step 1: Get presigned URL
+        console.log("Getting presigned URL...");
+        const presignedResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/get-presigned-url", {
           method: "POST",
-          body: formData,
-          signal: AbortSignal.timeout(300000), // 5 minutes timeout
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ filename: file.name }),
+          signal: AbortSignal.timeout(30000), // 30 seconds timeout
         });
 
-        clearInterval(progressInterval);
-        setUploadProgress(100);
+        if (!presignedResponse.ok) {
+          const errorData = await presignedResponse.json().catch(() => ({}));
+          throw new Error(errorData.detail || "Failed to get presigned URL");
+        }
+
+        const presignedData = await presignedResponse.json();
+        const { presigned_url, key } = presignedData;
+        console.log("Presigned URL obtained, key:", key);
+
+        // Step 2: Upload file to R2 using presigned URL
+        console.log("Uploading to R2...");
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total) * 100;
+              setUploadProgress(Math.round(percentComplete));
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              setUploadProgress(100);
+              resolve();
+            } else {
+              reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+            }
+          });
+
+          xhr.addEventListener('error', () => {
+            reject(new Error('Upload failed due to network error'));
+          });
+
+          xhr.addEventListener('timeout', () => {
+            reject(new Error('Upload timed out'));
+          });
+
+          xhr.open('PUT', presigned_url);
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.timeout = 300000; // 5 minutes
+          xhr.send(file);
+        });
+
+        console.log("File uploaded to R2 successfully");
+
+        // Step 3: Process file from R2
+        console.log("Processing file from R2...");
+        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-from-r2", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ key }),
+          signal: AbortSignal.timeout(300000), // 5 minutes timeout
+        });
 
         const data = await response.json();
         console.log("Respuesta del backend:", data);
