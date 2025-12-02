@@ -32,8 +32,9 @@ ALLOWED_EXTENSIONS = [".las", ".csv", ".txt"]
 
 # Cloudflare R2 Configuration
 import os
-R2_ACCOUNT_ID = "b8535e30d92db719275627e13419d79a"
-R2_ACCESS_KEY_ID = "3fbdd5682b203f9f446001d92f880321"
-R2_SECRET_ACCESS_KEY = "fcb2049a62759ec2471e6146d8fc2cf071bfbb34520ee1c58f20c8c07394d85f"
-R2_BUCKET_NAME = "enertech3"
-R2_REGION = "auto"
+R2_ACCOUNT_ID = os.getenv("b8535e30d92db719275627e13419d79a")
+R2_ACCESS_KEY_ID = os.getenv("dea0fdd18fef5a61e7852ea82eb7665d")
+R2_SECRET_ACCESS_KEY = os.getenv("83e2723133007494f48bd68b23b8989f4f612bb44dd8943ba1eedd87b8258600")
+R2_BUCKET_NAME = os.getenv("enertech")
+R2_REGION = os.getenv("R2_REGION", "auto")  # Default to 'auto' for Cloudflare R2
+R2_ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else None
