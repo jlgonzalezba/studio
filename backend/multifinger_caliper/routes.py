@@ -59,8 +59,27 @@ async def get_presigned_url(request: PresignedUrlRequest):
     """
     Generate a presigned URL for uploading a file directly to Cloudflare R2.
     """
-    print(f"Environment variables: {list(os.environ.keys())}")
-    print(f"R2_BUCKET_NAME value: {repr(os.environ.get('R2_BUCKET_NAME'))}")
+    print(f"R2_ACCESS_KEY_ID: {bool(R2_ACCESS_KEY_ID)}")
+    print(f"R2_SECRET_ACCESS_KEY: {bool(R2_SECRET_ACCESS_KEY)}")
+    print(f"R2_ENDPOINT_URL: {R2_ENDPOINT_URL}")
+
+    try:
+        s3_client = get_r2_client()
+        print("R2 client created successfully")
+        # Probar generar la URL
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': R2_BUCKET_NAME,
+                'Key': 'test-key',
+                'ContentType': 'application/octet-stream'
+            },
+            ExpiresIn=3600
+        )
+        print(f"Presigned URL generated: {presigned_url[:50]}...")
+    except Exception as e:
+        print(f"Error creating R2 client or generating URL: {e}")
+        raise HTTPException(status_code=500, detail=f"R2 configuration error: {str(e)}")
 
     if not R2_BUCKET_NAME:
         raise HTTPException(status_code=500, detail="R2 bucket not configured")
