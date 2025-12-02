@@ -365,6 +365,35 @@ def extract_depth_and_r_values(df: pd.DataFrame) -> Dict:
     }
 
 
+def downsample_data(data: List, max_points: int = 50000) -> List:
+    """
+    Reduce el número de puntos de datos para optimización del frontend.
+    Mantiene la integridad de los datos tomando puntos equiespaciados.
+
+    Args:
+        data: Lista de datos a reducir
+        max_points: Número máximo de puntos permitidos
+
+    Returns:
+        Lista reducida de datos
+    """
+    if len(data) <= max_points:
+        return data
+
+    # Calcular el factor de downsampling
+    factor = len(data) // max_points
+    if factor < 2:
+        factor = 2  # Mínimo factor de reducción
+
+    # Tomar cada N-ésimo punto
+    downsampled = []
+    for i in range(0, len(data), factor):
+        downsampled.append(data[i])
+
+    print(f"[DOWNSAMPLING] Reduced {len(data)} points to {len(downsampled)} points (factor: {factor})")
+    return downsampled
+
+
 def process_caliper_data(use_centralized: bool = True) -> Dict:
     """
     Función principal que procesa los datos del caliper más reciente
@@ -506,12 +535,32 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
         print(f"[WARNING] Could not load collars data: {e}")
         collars_data = []
 
+    # Aplicar downsampling para optimización del frontend si hay demasiados puntos
+    plot_data = stats_result["plot_data"]
+    original_point_count = len(plot_data["depth"])
+
+    if original_point_count > 50000:
+        print(f"[DOWNSAMPLING] Applying downsampling to plot_data: {original_point_count} points")
+
+        # Downsampling de todos los arrays de plot_data
+        plot_data["depth"] = downsample_data(plot_data["depth"])
+        plot_data["min_diameter"] = downsample_data(plot_data["min_diameter"])
+        plot_data["max_diameter"] = downsample_data(plot_data["max_diameter"])
+        plot_data["avg_diameter"] = downsample_data(plot_data["avg_diameter"])
+
+        # Actualizar estadísticas con los datos downsampled
+        stats_result["statistics"]["total_points"] = len(plot_data["depth"])
+        stats_result["statistics"]["original_points"] = original_point_count
+
+        print(f"[DOWNSAMPLING] Plot data reduced to {len(plot_data['depth'])} points for frontend")
+
     # Retornar resultado completo
     return {
         "filename": filename,
         "total_points": stats_result["statistics"]["total_points"],
+        "original_points": stats_result["statistics"].get("original_points"),
         "r_curves_info": r_curves_info,
-        "plot_data": stats_result["plot_data"],
+        "plot_data": plot_data,
         "statistics": stats_result["statistics"],
         "raw_data": raw_data,
         "collars_data": collars_data

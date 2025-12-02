@@ -1064,8 +1064,16 @@ export default function MultifingerCaliperPage() {
         const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
         const numFingers = rCurves.length;
 
+        // Build file info message
+        let fileInfoMessage = `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`;
+
+        // Add downsampling info if applicable
+        if (data.original_points && data.original_points > data.point_count) {
+          fileInfoMessage += ` (Downsampled from ${data.original_points} to ${data.point_count} points for performance)`;
+        }
+
         updateState({
-          fileInfo: `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`,
+          fileInfo: fileInfoMessage,
           fileLoaded: true,
           isProcessed: false,
           isLoading: false
