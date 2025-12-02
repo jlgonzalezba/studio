@@ -1125,15 +1125,10 @@ export default function MultifingerCaliperPage() {
        setProcessProgress(100);
 
       const data = await response.json();
-      console.log("Respuesta del procesamiento:", data);
-      console.log("Full backend data:", JSON.stringify(data, null, 2));
-      console.log("Data structure:", {
+      console.log("Respuesta del procesamiento:", {
         hasPlotData: !!data.plot_data,
         plotDataKeys: data.plot_data ? Object.keys(data.plot_data) : [],
         depthLength: data.plot_data?.depth?.length,
-        minDiameterLength: data.plot_data?.min_diameter?.length,
-        maxDiameterLength: data.plot_data?.max_diameter?.length,
-        avgDiameterLength: data.plot_data?.avg_diameter?.length,
         hasRawData: !!data.raw_data,
         rawDataKeys: data.raw_data ? Object.keys(data.raw_data) : [],
         rawDepthLength: data.raw_data?.depth?.length,

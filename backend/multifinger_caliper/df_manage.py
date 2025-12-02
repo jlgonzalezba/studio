@@ -365,7 +365,7 @@ def extract_depth_and_r_values(df: pd.DataFrame) -> Dict:
     }
 
 
-def downsample_data(data: List, max_points: int = 50000) -> List:
+def downsample_data(data: List, max_points: int = 10000) -> List:
     """
     Reduce el número de puntos de datos para optimización del frontend.
     Mantiene la integridad de los datos tomando puntos equiespaciados.
@@ -539,7 +539,7 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
     plot_data = stats_result["plot_data"]
     original_point_count = len(plot_data["depth"])
 
-    if original_point_count > 50000:
+    if original_point_count > 10000:
         print(f"[DOWNSAMPLING] Applying downsampling to plot_data: {original_point_count} points")
 
         # Downsampling de todos los arrays de plot_data
@@ -553,6 +553,25 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
         stats_result["statistics"]["original_points"] = original_point_count
 
         print(f"[DOWNSAMPLING] Plot data reduced to {len(plot_data['depth'])} points for frontend")
+
+    # Downsample raw_data if necessary
+    if original_point_count > 10000:
+        print(f"[DOWNSAMPLING] Applying downsampling to raw_data: {len(raw_data['depth'])} points")
+
+        # Downsample depth
+        raw_data["depth"] = downsample_data(raw_data["depth"])
+
+        # Downsample r_curves (list of lists)
+        raw_data["r_curves"] = downsample_data(raw_data["r_curves"])
+
+        # Downsample GR and temp data
+        for key in raw_data["gr_data"]:
+            raw_data["gr_data"][key] = downsample_data(raw_data["gr_data"][key])
+        for key in raw_data["temp_data"]:
+            raw_data["temp_data"][key] = downsample_data(raw_data["temp_data"][key])
+
+        raw_data["total_points"] = len(raw_data["depth"])
+        print(f"[DOWNSAMPLING] Raw data reduced to {raw_data['total_points']} points for frontend")
 
     # Retornar resultado completo
     return {
