@@ -31,7 +31,7 @@ from .df_manage import process_caliper_data
 # Import configuration
 from ..config import (
     R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
-    R2_BUCKET_NAME, R2_ENDPOINT_URL
+    R2_BUCKET_NAME, R2_REGION, R2_ENDPOINT_URL
 )
 
 # Create router for multifinger caliper endpoints
@@ -49,6 +49,7 @@ def get_r2_client():
         endpoint_url=R2_ENDPOINT_URL,
         aws_access_key_id=R2_ACCESS_KEY_ID,
         aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name=R2_REGION,
         config=Config(signature_version='s3v4')
     )
 
@@ -59,14 +60,6 @@ async def get_presigned_url(request: PresignedUrlRequest):
     Generate a presigned URL for uploading a file directly to Cloudflare R2.
     """
     print(f"R2_BUCKET_NAME: {R2_BUCKET_NAME}")
-    try:
-        from .. import config
-        print(f"Config module loaded: {config}")
-        print(f"R2_BUCKET_NAME from config: {config.R2_BUCKET_NAME}")
-        print(f"All env vars: {dict(os.environ)}")
-    except Exception as e:
-        print(f"Error loading config: {e}")
-    
     if not R2_BUCKET_NAME:
         raise HTTPException(status_code=500, detail="R2 bucket not configured")
     
