@@ -365,7 +365,7 @@ def extract_depth_and_r_values(df: pd.DataFrame) -> Dict:
     }
 
 
-def downsample_data(data: List, max_points: int = 40000) -> List:
+def downsample_data(data: List, max_points: int = 50000) -> List:
     """
     Reduce el número de puntos de datos para optimización del frontend.
     Mantiene la integridad de los datos tomando puntos equiespaciados.
@@ -540,7 +540,7 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
     plot_data = stats_result["plot_data"]
     original_point_count = len(plot_data["depth"])
 
-    if original_point_count > 10000:
+    if original_point_count > 50000:
         print(f"[DOWNSAMPLING] Applying downsampling to plot_data: {original_point_count} points")
 
         # Downsampling de todos los arrays de plot_data

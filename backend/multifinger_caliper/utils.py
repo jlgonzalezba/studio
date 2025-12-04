@@ -26,8 +26,6 @@ def extract_las_metadata(las: lasio.LASFile) -> Dict[str, Any]:
 
 
 
-
-
 def validate_las_curves(las: lasio.LASFile) -> List[str]:
     """
     Validate and return list of valid curves in LAS file.

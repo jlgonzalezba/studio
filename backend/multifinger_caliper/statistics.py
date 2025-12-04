@@ -38,18 +38,22 @@ def data_and_min_max_mean(data_fingers,dept):
     N = data_fingers.shape[1] # numero de fingers
     half = N//2  # mitad de numero de fingers
 
-    diameters = np.zeros((data_fingers.shape[0], half)) # se crea un np con ceros con las dimensiones de # de filas cy # de columnas / 2
+    diameters_full = np.zeros((data_fingers.shape[0], N)) # se crea un np con ceros con las dimensiones de # de filas cy # de columnas / 2
+    diameters_half = np.zeros((data_fingers.shape[0], half))
 
     # se llena el array con los diametros
     for i in range(half):
-        #diameters[:,i] = data_fingers[:,i] + data_fingers[:, i+half]
-        diameters[:,i] = data_fingers[:,i]*2
+        diameters_half[:,i] = data_fingers[:,i] + data_fingers[:, i+half]
+        
+    for i in range(N):
+        diameters_full[:,i] = data_fingers[:,i]*2
 
-    data_fingers = diameters.copy()  # ahora fingers tiene la data de diamtros
 
-    mean_col = data_fingers.mean(axis=1)
-    min_col = data_fingers.min(axis=1)
-    max_col = data_fingers.max(axis=1)
+    data_fingers = diameters_half.copy()  # ahora fingers tiene la data de diametros
+
+    mean_col = diameters_half.mean(axis=1)
+    min_col = diameters_half.min(axis=1)
+    max_col = diameters_full.max(axis=1)
 
     mean_col = mean_col[:,None]
     min_col = min_col[:,None]
@@ -226,3 +230,8 @@ statistics_table,styled = continue_statistics(statistics_table,pipes)
 export_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'exports')
 styled.to_excel(os.path.join(export_dir,"estadisticas_coloreadas.xlsx"))
 statistics_table.to_csv(os.path.join(export_dir, 'table_statistics.csv'), index=False, float_format='%.4f')
+
+
+
+data= pd.DataFrame(data)
+data.to_csv(os.path.join(os.path.dirname(__file__), '..', '..', 'exports', 'data.csv'), index=False, float_format='%.4f')

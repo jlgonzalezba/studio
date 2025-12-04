@@ -27,6 +27,7 @@ def process_las_data(las: lasio.LASFile) -> Dict[str, Any]:
     """
 
 
+
     # Usa las utilidades para extraer información
     file_info = get_las_file_info(las)
     valid_curves = validate_las_curves(las)
@@ -316,7 +317,7 @@ def export_las_curves_to_csv(las: lasio.LASFile, output_path: str = None) -> Dic
         # Aplicar algoritmo de elipse excéntrica
         if r_values and any(v is not None for v in r_values):
             centralized_r_values = apply_taubin_centralization(r_values)
-
+            centralized_r_values = [round(valor, 4) for valor in centralized_r_values]
             # Actualizar la fila con los valores centralizados
             for i, idx in enumerate(r_columns_indices):
                 if i < len(centralized_r_values) and centralized_r_values[i] is not None:

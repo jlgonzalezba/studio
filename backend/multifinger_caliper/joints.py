@@ -32,6 +32,9 @@ def read_latest_centralized_csv():
     return df
 
 df = read_latest_centralized_csv()
+zero_counts = (df==0).sum(axis=1)
+threshold_zero= df.shape[1]/1.5
+df = df[zero_counts < threshold_zero]
 
 # Filtrar los nombres de columnas R01-R40 y la columna DEPT o la primera columna si DEPT no existe
 def curves_and_depth(df: pd.DataFrame):
@@ -261,6 +264,20 @@ def detect_caliper_collars(avg_fingers_changed: np.ndarray, dept: np.ndarray,col
     while i < N:
 
         if abs(avg_fingers_changed[i]) > threshold:
+            
+            # Sirve para detectar  cuellos en cambios de libraje, donde todos los dedos cambian pero no regresan a la posición original
+            if abs(avg_fingers_changed[i]) == 1:
+                dept_ini = dept[i-6] if i >= 6 else dept[0]
+                dept_final = dept[i+6] if i + 6 < N else dept[N-1]
+                if collars.shape[0]>0:
+                    if dept_ini < (collars[-1,1] + 4): # Si el cuello detectado esta muy pegado al anterior pone como dept final del nuevo cuello
+                        collars[-1,1] = dept_final
+                        
+                    else:
+                        collars = np.vstack([collars, [dept_ini, dept_final]])
+                else:
+                    collars = np.vstack([collars, [dept_ini, dept_final]])
+
             
             dept_ini = dept[i-6] if i >= 6 else dept[0]  # marcar inicio del cuello 0.6 ft antes
             pivot = avg_fingers_changed[i]
