@@ -25,6 +25,9 @@ def extract_las_metadata(las: lasio.LASFile) -> Dict[str, Any]:
     return metadata
 
 
+
+
+
 def validate_las_curves(las: lasio.LASFile) -> List[str]:
     """
     Validate and return list of valid curves in LAS file.
@@ -69,6 +72,7 @@ def calculate_curve_statistics(las: lasio.LASFile, curve_name: str) -> Dict[str,
         raise ValueError(f"Curve '{curve_name}' not found in LAS file")
     except Exception as e:
         raise ValueError(f"Error calculating statistics for curve '{curve_name}': {str(e)}")
+
 
 
 def get_las_file_info(las: lasio.LASFile) -> Dict[str, Any]:
