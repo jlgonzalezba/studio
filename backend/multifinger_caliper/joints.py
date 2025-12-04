@@ -14,7 +14,6 @@ finger_jump_slim = 0.014
 threshold = 0.55  # umbral para considerar un cambio significativo en la mayoría de los dedos, porcentaje
 slim_threshold = 0.5
 slim_threshold_1 = 0.4  # umbral para detectar cuellos delgados, porcentaje
-# slim_threshold_2 = 0.2  # umbral para detectar cuellos delgados acompañamiento de slim_threshold_1, porcentaje
 collar_lenght_steps = 20  # con un step de 0.1 ft, XX pasos  para funcion range() = XX*0.1 ft de longitud máxima del cuello
 
 
@@ -160,7 +159,7 @@ def detect_slim_collars(avg_fingers_changed_slim: np.ndarray, dept: np.ndarray, 
         
         
 
-        while dept[j] < (dept[idx] -0.5):
+        while dept[j] < (dept[idx] -0.5):  
             score = 0
            
             if abs(avg_fingers_changed_slim[j]) > slim_threshold:
@@ -320,7 +319,13 @@ collars, slim_collars, slim_collars_2 = detect_caliper_collars(avg_fingers_chang
 def collars_top_bottom(collars, dept):
     top_raw = np.array([[np.nan,dept[0]]])
     bottom_raw = np.array([[dept[-1], np.nan]])
-    collars = np.vstack([top_raw, collars, bottom_raw])
+
+    if collars[0,0] == dept[0]:
+       collars[0,0]=np.nan
+       collars = np.vstack([collars, bottom_raw])
+    else:
+        collars = np.vstack([top_raw, collars, bottom_raw])
+
     return collars
 
 collars = collars_top_bottom(collars, dept)
@@ -358,11 +363,12 @@ def insert_slim_collars_and_others(collars, slim_collars, slim_collars_2, avg):
     for slim_collar in slim_collars:
 
         idx = np.searchsorted(collars_full[:,0], slim_collar[0])
-
+        if idx == 0:  # si el indice cae en 0, se suma uno ya que la psicision [0,0] es nan para collars
+            idx+=1
         top_distance = abs(collars_full[idx-1,1] - slim_collar[0])
         bottom_distance = abs(collars_full[idx,0] - slim_collar[1])
 
-        if top_distance > avg*0.85 and bottom_distance > avg*0.85:
+        if avg*0.85 < top_distance < avg*1.15 and avg*0.85<bottom_distance < avg*1.15:
             collars_full = np.insert(collars_full, idx, slim_collar, axis=0)
             print(f'Inserted slim_collar {slim_collar}, Top {top_distance} Bottom {bottom_distance}')
 
@@ -372,11 +378,12 @@ def insert_slim_collars_and_others(collars, slim_collars, slim_collars_2, avg):
     for slim_collar in slim_collars_2:
 
         idx = np.searchsorted(collars_full[:,0], slim_collar[0])
-
+        if idx == 0: # si el indice cae en 0, se suma uno ya que la psicision [0,0] es nan para collars
+            idx+=1
         top_distance = abs(collars_full[idx-1,1] - slim_collar[0])
         bottom_distance = abs(collars_full[idx,0] - slim_collar[1])
 
-        if top_distance > avg*0.85 and bottom_distance > avg*0.85:
+        if avg*0.85 < top_distance < avg*1.15 and avg*0.85<bottom_distance < avg*1.15:
             collars_full = np.insert(collars_full, idx, slim_collar, axis=0)
             print(f'Inserted slim_collar 2{slim_collar}, Top {top_distance} Bottom {bottom_distance}')
         
@@ -410,7 +417,11 @@ def insert_slim_collars_and_others(collars, slim_collars, slim_collars_2, avg):
                     print(f'Collar adicional a {collar}')
             print(f'Collars to add array {collars_to_add}')
     for collar in collars_to_add:
+
+
         idx = np.searchsorted(collars_full[:,0], collar[0])
+        if idx == 0: # si el indice cae en 0, se suma uno ya que la psicision [0,0] es nan para collars
+            idx+=1
         collars_full = np.insert(collars_full, idx, collar, axis=0)
         
 

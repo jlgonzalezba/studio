@@ -365,7 +365,7 @@ def extract_depth_and_r_values(df: pd.DataFrame) -> Dict:
     }
 
 
-def downsample_data(data: List, max_points: int = 10000) -> List:
+def downsample_data(data: List, max_points: int = 40000) -> List:
     """
     Reduce el número de puntos de datos para optimización del frontend.
     Mantiene la integridad de los datos tomando puntos equiespaciados.
@@ -464,26 +464,27 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
         csv_mtime = os.path.getmtime(csv_path) if os.path.exists(csv_path) else 0
         collars_mtime = os.path.getmtime(collars_path) if os.path.exists(collars_path) else 0
 
-        # Forzar regeneración de collars si el archivo actual es diferente al último procesado
-        # Esto asegura que los collars se regeneren para cada pozo diferente
-        if not os.path.exists(collars_path) or collars_mtime < csv_mtime:
-            print(f"[PROCESS] Generating collars for {filename}...")
-            # Ejecutar la lógica de joints.py directamente
-            import subprocess
-            import sys
-            try:
-                print("[PROCESS] Running joints.py")
-                # Ejecutar joints.py como script separado
-                result = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "joints.py")],
-                                      capture_output=True, text=True, cwd=os.path.dirname(__file__))
-                if result.returncode == 0:
-                    print(f"[PROCESS] Collars generated successfully for {filename}")
-                else:
-                    print(f"[PROCESS] Error generating collars: returncode={result.returncode}, stderr={result.stderr}")
-            except Exception as e:
-                print(f"[PROCESS] Could not execute joints.py: {e}")
+        # Ejecutar joints.py y statistics.py en cada procesamiento
+        print(f"[PROCESS] Generating collars and statistics for {filename}...")
+        # Ejecutar la lógica de joints.py directamente
+        import subprocess
+        import sys
+        joints_success = False
+        try:
+            print("[PROCESS] Running joints.py")
+            # Ejecutar joints.py como script separado
+            result = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "joints.py")],
+                                  capture_output=True, text=True, cwd=os.path.dirname(__file__))
+            if result.returncode == 0:
+                print(f"[PROCESS] Collars generated successfully for {filename}")
+                joints_success = True
+            else:
+                print(f"[PROCESS] Error generating collars: returncode={result.returncode}, stderr={result.stderr}")
+        except Exception as e:
+            print(f"[PROCESS] Could not execute joints.py: {e}")
 
-            # Ejecutar statistics.py después de joints.py
+        # Ejecutar statistics.py solo si joints.py fue exitoso
+        if joints_success:
             try:
                 print("[PROCESS] Running statistics.py")
                 result_stats = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "statistics.py")],
@@ -495,7 +496,7 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
             except Exception as e:
                 print(f"[PROCESS] Could not execute statistics.py: {e}")
         else:
-            print(f"[PROCESS] Collars already exist for {filename}")
+            print(f"[PROCESS] Skipping statistics.py because joints.py failed")
 
         elapsed = time.time() - start_time
         processing_progress = min(100, max(90, (elapsed / 4.0) * 100))

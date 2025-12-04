@@ -13,6 +13,8 @@ from typing import Dict, List, Any, Tuple
 from .utils import get_las_file_info, validate_las_curves
 
 
+
+
 def process_las_data(las: lasio.LASFile) -> Dict[str, Any]:
     """
     Función mínima que procesa el objeto LAS ya creado.
@@ -23,6 +25,8 @@ def process_las_data(las: lasio.LASFile) -> Dict[str, Any]:
     Returns:
         Dictionary with processed LAS data
     """
+
+
     # Usa las utilidades para extraer información
     file_info = get_las_file_info(las)
     valid_curves = validate_las_curves(las)

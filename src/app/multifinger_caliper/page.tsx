@@ -978,106 +978,151 @@ export default function MultifingerCaliperPage() {
       });
       setUploadProgress(0);
 
-      const formData = new FormData();
-      formData.append("file", file);
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const backendUrl = isDevelopment ? 'http://localhost:8000' : 'https://studio-2lx4.onrender.com';
 
       try {
-        // Step 1: Get presigned URL
-        console.log("Getting presigned URL...");
-        const presignedResponse = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/get-presigned-url", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ filename: file.name }),
-          signal: AbortSignal.timeout(30000), // 30 seconds timeout
-        });
+        if (isDevelopment) {
+          // Development: Direct upload to backend
+          console.log("Development mode: Uploading directly to backend...");
+          setUploadProgress(50); // Simulate progress
 
-        if (!presignedResponse.ok) {
-          const errorData = await presignedResponse.json().catch(() => ({}));
-          throw new Error(errorData.detail || "Failed to get presigned URL");
-        }
+          const formData = new FormData();
+          formData.append("file", file);
 
-        const presignedData = await presignedResponse.json();
-        const { presigned_url, key } = presignedData;
-        console.log("Presigned URL obtained, key:", key);
+          const response = await fetch(`${backendUrl}/api/multifinger-caliper/upload`, {
+            method: "POST",
+            body: formData,
+            signal: AbortSignal.timeout(300000), // 5 minutes timeout
+          });
 
-        // Step 2: Upload file to R2 using presigned URL
-        console.log("Uploading to R2...");
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
+          setUploadProgress(100);
+          const data = await response.json();
+          console.log("Respuesta del backend (direct):", data);
 
-          xhr.upload.addEventListener('progress', (event) => {
-            if (event.lengthComputable) {
-              const percentComplete = (event.loaded / event.total) * 100;
-              setUploadProgress(Math.round(percentComplete));
+          if (!response.ok) {
+            if (data.detail && data.detail.startsWith("ERROR:")) {
+              throw new Error(data.detail.replace("ERROR: ", ""));
             }
-          });
-
-          xhr.addEventListener('load', () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              setUploadProgress(100);
-              resolve();
-            } else {
-              reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
-            }
-          });
-
-          xhr.addEventListener('error', () => {
-            reject(new Error('Upload failed due to network error'));
-          });
-
-          xhr.addEventListener('timeout', () => {
-            reject(new Error('Upload timed out'));
-          });
-
-          xhr.open('PUT', presigned_url);
-          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-          xhr.timeout = 300000; // 5 minutes
-          xhr.send(file);
-        });
-
-        console.log("File uploaded to R2 successfully");
-
-        // Step 3: Process file from R2
-        console.log("Processing file from R2...");
-        const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/upload-from-r2", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ key }),
-          signal: AbortSignal.timeout(300000), // 5 minutes timeout
-        });
-
-        const data = await response.json();
-        console.log("Respuesta del backend:", data);
-
-        if (!response.ok) {
-          if (data.detail && data.detail.startsWith("ERROR:")) {
-            throw new Error(data.detail.replace("ERROR: ", ""));
+            throw new Error("Error al procesar el archivo en el backend.");
           }
-          throw new Error("Error al procesar el archivo en el backend.");
+
+          // Count number of fingers (R curves)
+          const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+          const numFingers = rCurves.length;
+
+          // Build file info message
+          let fileInfoMessage = `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`;
+
+          // Add downsampling info if applicable
+          if (data.original_points && data.original_points > data.point_count) {
+            fileInfoMessage += ` (Downsampled from ${data.original_points} to ${data.point_count} points for performance)`;
+          }
+
+          updateState({
+            fileInfo: fileInfoMessage,
+            fileLoaded: true,
+            isProcessed: false,
+            isLoading: false
+          });
+        } else {
+          // Production: Upload via R2
+          console.log("Production mode: Getting presigned URL...");
+          const presignedResponse = await fetch(`${backendUrl}/api/multifinger-caliper/get-presigned-url`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ filename: file.name }),
+            signal: AbortSignal.timeout(30000), // 30 seconds timeout
+          });
+
+          if (!presignedResponse.ok) {
+            const errorData = await presignedResponse.json().catch(() => ({}));
+            throw new Error(errorData.detail || "Failed to get presigned URL");
+          }
+
+          const presignedData = await presignedResponse.json();
+          const { presigned_url, key } = presignedData;
+          console.log("Presigned URL obtained, key:", key);
+
+          // Step 2: Upload file to R2 using presigned URL
+          console.log("Uploading to R2...");
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (event) => {
+              if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total) * 100;
+                setUploadProgress(Math.round(percentComplete));
+              }
+            });
+
+            xhr.addEventListener('load', () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                setUploadProgress(100);
+                resolve();
+              } else {
+                reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+              }
+            });
+
+            xhr.addEventListener('error', () => {
+              reject(new Error('Upload failed due to network error'));
+            });
+
+            xhr.addEventListener('timeout', () => {
+              reject(new Error('Upload timed out'));
+            });
+
+            xhr.open('PUT', presigned_url);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.timeout = 300000; // 5 minutes
+            xhr.send(file);
+          });
+
+          console.log("File uploaded to R2 successfully");
+
+          // Step 3: Process file from R2
+          console.log("Processing file from R2...");
+          const response = await fetch(`${backendUrl}/api/multifinger-caliper/upload-from-r2`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ key }),
+            signal: AbortSignal.timeout(300000), // 5 minutes timeout
+          });
+
+          const data = await response.json();
+          console.log("Respuesta del backend:", data);
+
+          if (!response.ok) {
+            if (data.detail && data.detail.startsWith("ERROR:")) {
+              throw new Error(data.detail.replace("ERROR: ", ""));
+            }
+            throw new Error("Error al procesar el archivo en el backend.");
+          }
+
+          // Count number of fingers (R curves)
+          const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
+          const numFingers = rCurves.length;
+
+          // Build file info message
+          let fileInfoMessage = `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`;
+
+          // Add downsampling info if applicable
+          if (data.original_points && data.original_points > data.point_count) {
+            fileInfoMessage += ` (Downsampled from ${data.original_points} to ${data.point_count} points for performance)`;
+          }
+
+          updateState({
+            fileInfo: fileInfoMessage,
+            fileLoaded: true,
+            isProcessed: false,
+            isLoading: false
+          });
         }
-
-        // Count number of fingers (R curves)
-        const rCurves = data.curves_found.filter((curve: string) => curve.startsWith('R') && curve.length > 1 && /^\d+$/.test(curve.substring(1)));
-        const numFingers = rCurves.length;
-
-        // Build file info message
-        let fileInfoMessage = `File processed: ${file.name}. Points: ${data.point_count}. Format: ${data.point_format_id}. Well: ${data.well_name}. Number of fingers: ${numFingers}.`;
-
-        // Add downsampling info if applicable
-        if (data.original_points && data.original_points > data.point_count) {
-          fileInfoMessage += ` (Downsampled from ${data.original_points} to ${data.point_count} points for performance)`;
-        }
-
-        updateState({
-          fileInfo: fileInfoMessage,
-          fileLoaded: true,
-          isProcessed: false,
-          isLoading: false
-        });
 
       } catch (err: any) {
         console.error(err);
@@ -1112,7 +1157,10 @@ export default function MultifingerCaliperPage() {
          setProcessProgress(Math.round(progress));
        }, 400);
 
-       const response = await fetch("https://studio-2lx4.onrender.com/api/multifinger-caliper/process-caliper", {
+       const isDevelopment = process.env.NODE_ENV === 'development';
+       const backendUrl = isDevelopment ? 'http://localhost:8000' : 'https://studio-2lx4.onrender.com';
+
+       const response = await fetch(`${backendUrl}/api/multifinger-caliper/process-caliper`, {
          method: "POST",
          headers: {
            "Content-Type": "application/json",
