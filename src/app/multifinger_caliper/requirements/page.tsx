@@ -64,8 +64,11 @@ export default function RequirementsPage() {
                   Data must run from top to bottom.
                   <br />
                   <span className="text-sm text-gray-500 ml-6 block mt-1">
-                    Example: STRT.FT 10.0 - STOP.FT 500.0
+                    Example: STRT.FT 32.0 - STOP.FT 500.0
                   </span>
+                </li>
+                <li>
+                  .LAS files must not exceed  +-60mb. This is a limitation about web browsers that we are working to solve.
                 </li>
                 <li>
                   Make sure your caliper curves are named as "RXX".

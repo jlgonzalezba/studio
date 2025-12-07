@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AppCard } from "@/components/app-card";
-import { LayoutTemplate, Calculator, Target, BarChart, View } from "lucide-react";
+import { LayoutTemplate, BarChart } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -92,15 +92,6 @@ export default function Home() {
 
         <section className="container mx-auto px-4 pb-12 md:pb-20">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <Link href="/universal-converter">
-              <AppCard
-                icon={Calculator}
-                title="Universal Converter"
-                subtitle="Quick unit conversion"
-                description="Convert well log units quickly and accurately, supporting multiple LAS and CSV formats."
-                color="green"
-              />
-            </Link>
             <Link href="/multifinger_caliper">
               <AppCard
                 icon={LayoutTemplate}
@@ -108,26 +99,6 @@ export default function Home() {
                 subtitle="Instant preview"
                 description="Get instant previews of your multifinger caliper log results"
                 color="blue"
-              />
-            </Link>
-            
-            <Link href="#">
-              <AppCard
-                icon={Target}
-                title="CBL Fast Look"
-                description="Placeholder for the third application. Focused on achieving your goals with precision and efficiency."
-                color="red"
-                status="coming-soon"
-              />
-            </Link>
-
-            <Link href="#">
-              <AppCard
-                icon={View}
-                title="Sigma to Pseudo-Resistivity"
-                description="Placeholder for the fourth application. Visualize your data and results in a completely new way."
-                color="yellow"
-                status="coming-soon"
               />
             </Link>
 
@@ -138,14 +109,7 @@ export default function Home() {
                 subtitle="Real-time interpretation"
                 description="Analyze production logs (PLT) on the fly for immediate insights."
                 color="purple"
-              />
-            </Link>
-            <Link href="#">
-              <AppCard
-                icon={View}
-                title="New App Two"
-                description="This is another placeholder for a new application. Feel free to customize it."
-                color="pink"
+                status="coming-soon"
               />
             </Link>
           </div>
