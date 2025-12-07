@@ -25,7 +25,7 @@ from pipes_list import pipes_data
 
 
 # constantes
-tally_difference = 0.6/100
+tally_difference = 0.3/100
 
 
 collars = collars.to_numpy()
@@ -49,9 +49,9 @@ def data_and_min_max_mean(data_fingers,dept):
         diameters_full[:,i] = data_fingers[:,i]*2
 
 
-    data_fingers = diameters_half.copy()  # ahora fingers tiene la data de diametros
+    data_fingers = diameters_full.copy()  # ahora fingers tiene la data de diametros
 
-    mean_col = diameters_half.mean(axis=1)
+    mean_col = diameters_full.mean(axis=1)
     min_col = diameters_half.min(axis=1)
     max_col = diameters_full.max(axis=1)
 
@@ -63,7 +63,7 @@ def data_and_min_max_mean(data_fingers,dept):
 
     # ahora se convertira todo a pandas
 
-    cols_diam = [f"D{i+1:02d}" for i in range(half)]
+    cols_diam = [f"D{i+1:02d}" for i in range(N)]
     columns = ["DEPT"] + cols_diam + ["MIN","MAX","MEAN"]
     
     data_fingers = pd.DataFrame(data_fingers, columns=columns) 
@@ -113,7 +113,7 @@ def start_pipe_statistics(pipes):
             # Normalmente asignar el tamaño de casing donde el ID nominal esta por debajo de mean....
             # .... pero si el ID nominal proxima hacia arriba esta muy cerca, se lo asigna.
 
-            if difference_up < mean*tally_difference:
+            if difference_up < mean*tally_difference:  #tally_difference arriba en constantes
                 od = new_size_up["OD"].iloc[0]
                 id = new_size_up["ID"].iloc[0]
                 weigth = new_size_up["WEIGHT"].iloc[0]
@@ -227,6 +227,16 @@ def continue_statistics(statistics_table, pipes):
 
 statistics_table,styled = continue_statistics(statistics_table,pipes)
 
+
+
+
+
+
+
+
+
+
+
 export_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'exports')
 styled.to_excel(os.path.join(export_dir,"estadisticas_coloreadas.xlsx"))
 statistics_table.to_csv(os.path.join(export_dir, 'table_statistics.csv'), index=False, float_format='%.4f')
@@ -235,3 +245,34 @@ statistics_table.to_csv(os.path.join(export_dir, 'table_statistics.csv'), index=
 
 data= pd.DataFrame(data)
 data.to_csv(os.path.join(os.path.dirname(__file__), '..', '..', 'exports', 'data.csv'), index=False, float_format='%.4f')
+
+
+
+
+
+#CREAR PANDAS CON LOS OD's & ID's Y SU PROFUNDIDAD
+
+def od_id(dept, statistics_table):
+
+    df_od_id = pd.DataFrame(columns = ["DEPT","OD","ID"])
+
+    dept_col=dept[:,None]
+    tops = statistics_table["BOTTOM"].to_numpy()
+    for dept in dept_col:
+
+
+        idx = np.searchsorted(tops, dept)
+        idx=int(idx)
+        if idx >=len(tops):
+            idx=len(tops)-1
+
+        df_od_id.loc[len(df_od_id)] = {
+            "DEPT":float(dept), 
+            "OD":statistics_table.iat[idx,statistics_table.columns.get_loc("OD")],
+            "ID":statistics_table.iat[idx,statistics_table.columns.get_loc("ID")]
+        }
+    return df_od_id
+
+
+df_id_od = od_id(dept,statistics_table)
+df_id_od.to_csv(os.path.join(os.path.dirname(__file__), '..', '..', 'exports', 'OD_ID.csv'), index=False, float_format='%.4f')

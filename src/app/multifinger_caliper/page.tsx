@@ -103,10 +103,10 @@ const HTML5CanvasPlot = ({
     const visibleDiamMax = useCustomScale ? customMaxDiam : (zoomState.maxDiam ?? diamMax);
 
     // Function to draw line
-    const drawLine = (points: number[][], color: string) => {
+    const drawLine = (points: number[][], color: string, thickness: number = 1) => {
       if (points.length === 0) return;
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = thickness;
       ctx.beginPath();
       ctx.moveTo(points[0][0], points[0][1]);
       for (let i = 1; i < points.length; i++) {
@@ -135,6 +135,21 @@ const HTML5CanvasPlot = ({
     drawLine(minPoints, '#0066ff');
     drawLine(maxPoints, '#cc0000');
     drawLine(avgPoints, '#66ffff');
+
+    // Draw ID line from od_id_data (black line)
+    if (data.od_id_data && Array.isArray(data.od_id_data)) {
+      const idPoints: number[][] = [];
+      data.od_id_data.forEach((item: any) => {
+        const depth = item.DEPT;
+        const idValue = item.ID;
+        if (depth >= visibleDepthMin && depth <= visibleDepthMax && idValue !== null && idValue !== undefined) {
+          const x = Math.max(10, Math.min(390, ((idValue - visibleDiamMin) / (visibleDiamMax - visibleDiamMin)) * 380 + 10));
+          const y = 15 + ((depth - visibleDepthMin) / (visibleDepthMax - visibleDepthMin)) * 535;
+          idPoints.push([x, y]);
+        }
+      });
+      drawLine(idPoints, 'black', 2); // ID line with thickness 2
+    }
 
     // Draw GR
     if (plotGR) {
@@ -779,7 +794,7 @@ const HTML5CanvasPlot = ({
 
 
 // Cross Section Plot Component
-const CrossSectionPlot = ({ data, currentDepth }: { data: any, currentDepth: number | null }) => {
+const CrossSectionPlot = ({ data, currentDepth, setCurrentODID }: { data: any, currentDepth: number | null, setCurrentODID: (od: number | null, id: number | null) => void }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -822,20 +837,51 @@ const CrossSectionPlot = ({ data, currentDepth }: { data: any, currentDepth: num
     const centerX = 200;
     const centerY = 200;
 
-    const nominalCasingRadius = 3.5; // 7-inch diameter
+    // Find OD and ID for current depth from od_id_data
+    let od = 7; // default 7-inch diameter
+    let id = 6.276; // default ID for 7-inch casing
+    if (data.od_id_data && Array.isArray(data.od_id_data)) {
+      let closestIndex = 0;
+      let minDepthDiff = Math.abs(data.od_id_data[0].DEPT - currentDepth);
+      for (let i = 1; i < data.od_id_data.length; i++) {
+        const diff = Math.abs(data.od_id_data[i].DEPT - currentDepth);
+        if (diff < minDepthDiff) {
+          minDepthDiff = diff;
+          closestIndex = i;
+        }
+      }
+      od = data.od_id_data[closestIndex].OD || od;
+      id = data.od_id_data[closestIndex].ID || id;
+    }
+
+    // Update the current OD/ID values in the parent component
+    setCurrentODID(od, id);
+
+    const odRadius = od / 2; // OD radius in inches
+    const idRadius = id / 2; // ID radius in inches
     const maxR = r.filter(val => val !== null).reduce((max, val) => Math.max(max, val), -Infinity);
     if (maxR === 0) return;
 
     // Determine the radius for scaling to ensure everything fits
-    const scaleRadius = Math.max(nominalCasingRadius, maxR);
+    const scaleRadius = Math.max(odRadius, maxR);
     const scale = 180 / scaleRadius; // fit within 180 pixels
 
-    // Draw fixed 7-inch casing circle
+    // Draw OD circle (black)
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 2;
+    ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.arc(centerX, centerY, nominalCasingRadius * scale, 0, 2 * Math.PI);
+    ctx.arc(centerX, centerY, odRadius * scale, 0, 2 * Math.PI);
     ctx.stroke();
+
+    // Draw ID circle (red, dashed)
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, idRadius * scale, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.setLineDash([]); // Reset dash
 
     // Draw points and lines
     ctx.strokeStyle = 'blue';
@@ -912,11 +958,17 @@ export default function MultifingerCaliperPage() {
         customMaxDiam,
         isUncentralised,
         showFingerReadings,
-        showCollars
+        showCollars,
+        currentOD,
+        currentID
     } = state;
 
     const updateState = (updates: any) => {
         setState(prev => ({ ...prev, ...updates }));
+    };
+
+    const setCurrentODID = (od: number | null, id: number | null) => {
+        updateState({ currentOD: od, currentID: id });
     };
 
    // Ref para el input de archivo oculto
@@ -993,7 +1045,7 @@ export default function MultifingerCaliperPage() {
           const response = await fetch(`${backendUrl}/api/multifinger-caliper/upload`, {
             method: "POST",
             body: formData,
-            signal: AbortSignal.timeout(300000), // 5 minutes timeout
+            signal: AbortSignal.timeout(600000), // 10 minutes timeout
           });
 
           setUploadProgress(100);
@@ -1387,7 +1439,14 @@ export default function MultifingerCaliperPage() {
                         <div className="mb-5 pb-9">
                             <span className="text-x1 font-semibold">Cross Section</span>
                         </div>
-                        <CrossSectionPlot data={plotData} currentDepth={currentDepth} />
+                        <CrossSectionPlot data={plotData} currentDepth={currentDepth} setCurrentODID={setCurrentODID} />
+                        {currentOD !== null && currentID !== null && (
+                            <div className="mt-4 text-center">
+                                <p className="text-lg font-semibold text-gray-800">
+                                    OD: {currentOD.toFixed(3)}", ID: {currentID.toFixed(3)}"
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Overlay de carga cuando está procesando */}

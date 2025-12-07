@@ -140,6 +140,7 @@ def calculate_caliper_statistics(df: pd.DataFrame, r_curves_info: Dict) -> Dict:
     min_values = []
     max_values = []
     avg_values = []
+    min_opposite_values = []  # Nuevo: mínimo calculado con dedos opuestos
 
     print(f"[DEBUG] Processing {len(df_clean)} rows...")
 
@@ -171,11 +172,29 @@ def calculate_caliper_statistics(df: pd.DataFrame, r_curves_info: Dict) -> Dict:
             min_values.append(min(diameters))
             max_values.append(max(diameters))
             avg_values.append(sum(diameters) / len(diameters))
+
+            # Calcular mínimo usando método de dedos opuestos (como en statistics.py)
+            num_fingers = len(r_values)
+            half = num_fingers // 2
+            opposite_diameters = []
+
+            for i in range(half):
+                if i + half < num_fingers:
+                    # Diámetro = radio_i + radio_opuesto
+                    opposite_diameter = r_values[i] + r_values[i + half]
+                    opposite_diameters.append(opposite_diameter)
+
+            if opposite_diameters:
+                min_opposite_values.append(min(opposite_diameters))
+            else:
+                # Fallback si no se pueden calcular opuestos
+                min_opposite_values.append(min(diameters))
         else:
             # Si no hay valores válidos, usar 0 como placeholder
             min_values.append(0)
             max_values.append(0)
             avg_values.append(0)
+            min_opposite_values.append(0)
 
         # Debug output for first few rows
         if idx < 3:
@@ -193,7 +212,7 @@ def calculate_caliper_statistics(df: pd.DataFrame, r_curves_info: Dict) -> Dict:
 
     # Solo usar puntos válidos
     plot_depth = [depth_values[i] for i in valid_indices]
-    plot_min = [min_values[i] for i in valid_indices]
+    plot_min = [min_opposite_values[i] for i in valid_indices]  # Usar el mínimo de dedos opuestos
     plot_max = [max_values[i] for i in valid_indices]
     plot_avg = [avg_values[i] for i in valid_indices]
 
@@ -220,6 +239,11 @@ def calculate_caliper_statistics(df: pd.DataFrame, r_curves_info: Dict) -> Dict:
                 "min": min(plot_avg),
                 "max": max(plot_avg),
                 "mean": sum(plot_avg) / len(plot_avg)
+            },
+            "min_diameter_stats": {
+                "min": min(plot_min),
+                "max": max(plot_min),
+                "mean": sum(plot_min) / len(plot_min)
             }
         },
         "r_curves_info": r_curves_info
@@ -574,6 +598,46 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
         raw_data["total_points"] = len(raw_data["depth"])
         print(f"[DOWNSAMPLING] Raw data reduced to {raw_data['total_points']} points for frontend")
 
+    # Load OD/ID data from CSV
+    od_id_data = []
+    od_id_path = os.path.join(get_exports_dir(), "OD_ID.csv")
+    if os.path.exists(od_id_path):
+        try:
+            od_id_df = pd.read_csv(od_id_path)
+            od_id_data = od_id_df.to_dict('records')
+            print(f"[DEBUG] OD/ID data loaded: {len(od_id_data)} records")
+
+            # Apply downsampling to od_id_data if necessary (same as plot_data)
+            if original_point_count > 50000 and len(od_id_data) > 50000:
+                print(f"[DOWNSAMPLING] Applying downsampling to od_id_data: {len(od_id_data)} points")
+
+                # Extract individual arrays for downsampling
+                dept_values = [item['DEPT'] for item in od_id_data]
+                od_values = [item['OD'] for item in od_id_data]
+                id_values = [item['ID'] for item in od_id_data]
+
+                # Downsample each array
+                dept_downsampled = downsample_data(dept_values)
+                od_downsampled = downsample_data(od_values)
+                id_downsampled = downsample_data(id_values)
+
+                # Reconstruct the list of dictionaries
+                od_id_data = []
+                for i in range(len(dept_downsampled)):
+                    od_id_data.append({
+                        'DEPT': dept_downsampled[i],
+                        'OD': od_downsampled[i],
+                        'ID': id_downsampled[i]
+                    })
+
+                print(f"[DOWNSAMPLING] OD/ID data reduced to {len(od_id_data)} points for frontend")
+
+        except Exception as e:
+            print(f"[WARNING] Could not load OD/ID data: {e}")
+            od_id_data = []
+    else:
+        print(f"[WARNING] OD_ID.csv not found at {od_id_path}")
+
     # Retornar resultado completo
     return {
         "filename": filename,
@@ -583,7 +647,8 @@ def process_caliper_data(use_centralized: bool = True) -> Dict:
         "plot_data": plot_data,
         "statistics": stats_result["statistics"],
         "raw_data": raw_data,
-        "collars_data": collars_data
+        "collars_data": collars_data,
+        "od_id_data": od_id_data
     }
 
 # Código de prueba (solo se ejecuta si se corre este archivo directamente)
