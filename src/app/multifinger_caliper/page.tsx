@@ -1045,7 +1045,7 @@ export default function MultifingerCaliperPage() {
           const response = await fetch(`${backendUrl}/api/multifinger-caliper/upload`, {
             method: "POST",
             body: formData,
-            signal: AbortSignal.timeout(600000), // 10 minutes timeout
+            signal: AbortSignal.timeout(1000000), // 10 minutes timeout
           });
 
           setUploadProgress(100);
