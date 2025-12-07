@@ -238,7 +238,7 @@ statistics_table,styled = continue_statistics(statistics_table,pipes)
 
 
 export_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'exports')
-styled.to_excel(os.path.join(export_dir,"estadisticas_coloreadas.xlsx"))
+styled.to_excel(os.path.join(export_dir,"statistics_format.xlsx"))
 statistics_table.to_csv(os.path.join(export_dir, 'table_statistics.csv'), index=False, float_format='%.4f')
 
 

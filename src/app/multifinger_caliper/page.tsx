@@ -930,8 +930,8 @@ const CrossSectionPlot = ({ data, currentDepth, setCurrentODID }: { data: any, c
 // An array for menu items to keep the code clean.
 const menuItems = [
   { name: "Multifinger Home", href: "/multifinger_caliper" },
-  { name: "Decentralised Plots", href: "/multifinger_caliper/decentralised-plots" },
-  { name: "Reports", href: "#" },
+  { name: "Integrity Table", href: "/multifinger_caliper/integrity-table" },
+  { name: "Requirements", href: "/multifinger_caliper/requirements" },
   { name: "Settings", href: "#" },
   { name: "Help", href: "#" },
 ];
@@ -1278,7 +1278,9 @@ export default function MultifingerCaliperPage() {
         </aside>
         <main className="flex-1 p-6 flex flex-col">
           <div className="border-b border-gray-200 pb-5 mb-5">
-            <h1 className="text-3xl font-bold text-gray-800">Multifinger Caliper</h1>
+            <h1 className="text-3xl font-bold text-gray-800">Multifinger Caliper
+              <span className="text-sm font-normal text-gray-500 ml-2">(Version 0.1.0-beta.1)</span>
+            </h1>
              <p className="text-lg text-gray-500 mt-2">Interpretation and Preview Page</p>
           </div>
           <div className="flex flex-col items-center justify-center">

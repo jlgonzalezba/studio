@@ -283,6 +283,26 @@ async def get_progress():
     """
     return {"progress": processing_progress}
 
+@router.get("/download-integrity-table")
+async def download_integrity_table():
+    """
+    Download the styled integrity table Excel file.
+    """
+    import os
+    from fastapi.responses import FileResponse
+
+    exports_dir = os.path.join(os.path.dirname(__file__), "..", "..", "exports")
+    file_path = os.path.join(exports_dir, "statistics_format.xlsx")
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Integrity table file not found. Please process data first.")
+
+    return FileResponse(
+        path=file_path,
+        filename="integrity_table.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 @router.get("/health")
 async def health_check():
     """
