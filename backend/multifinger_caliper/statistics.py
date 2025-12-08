@@ -4,6 +4,13 @@ import pandas as pd
 import numpy as np
 import os
 from pipes_list import pipes_data
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
+from openpyxl.styles import Border, Side
+from openpyxl.styles import Font, PatternFill
+
+
 
 
 
@@ -99,7 +106,7 @@ def start_pipe_statistics(pipes):
         desviation.append(new_desviation) 
         mean = pipe["MEAN"].mean()
 
-        if new_desviation < 2:   # Solo asginar tañano de casing a los tubos donde mean no tiene mucha varianza
+        if new_desviation < 1.5:   # Solo asginar tañano de casing a los tubos donde mean no tiene mucha varianza
             new_size_down = pipes_data.loc[pipes_data["ID"] <= mean].nlargest(1, "ID")
             new_size_up = pipes_data.loc[pipes_data["ID"] >= mean].nsmallest(1, "ID")
 
@@ -167,17 +174,17 @@ def continue_statistics(statistics_table, pipes):
 
         #Diametro minimo y depth de diametro minimo
         idx = pipe["MIN"].idxmin()
-        min_id = pipe.loc[idx,"MIN"]
+        min_id = round(pipe.loc[idx,"MIN"],3)
         min_id_d = pipe.loc[idx,"DEPT"] 
 
         #Diametro maxima penetracion, prof maxima pen, % max pen
         idx = pipe["MAX"].idxmax()
-        max_id = pipe.loc[idx,"MAX"]
+        max_id = round(pipe.loc[idx,"MAX"],3)
         max_id_d = pipe.loc[idx,"DEPT"] 
 
         od_id = statistics_table.loc[i, "OD"]  - statistics_table.loc[i,"ID"]
         id = statistics_table.loc[i,"ID"]
-        penetration = (max_id-id)/(od_id)*100       
+        penetration = round((max_id-id)/(od_id)*100,2)
         
         if penetration < 0:
             penetration = 0
@@ -235,11 +242,70 @@ statistics_table,styled = continue_statistics(statistics_table,pipes)
 
 
 
-
+######STIYE EL EXCEL
 
 export_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'exports')
-styled.to_excel(os.path.join(export_dir,"statistics_format.xlsx"))
+styled.to_excel(os.path.join(export_dir,"statistics_format.xlsx"),index=False)
+# Load the exported Excel file
+wb = load_workbook(os.path.join(export_dir, "statistics_format.xlsx"))
+ws = wb.active
+# Set row heights for specific rows (adjust row numbers and heights as needed)
+ws.row_dimensions[1].height = 30  # Row 1
+
+# Save the modified file
+for row in [1]:  # The rows you modified
+    for col in range(1, ws.max_column + 1):  # All columns in the row
+        cell = ws.cell(row=row, column=col)
+        cell.alignment = Alignment(wrap_text=True)
+
+
+for col in range(1, ws.max_column + 1):  # All columns in the row
+    cell = ws.cell(row=1, column=col)
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+
+# Center text in an entire column (e.g., column 'A' for all rows)
+  # Change to the desired column letter (e.g., 'B', 'C')
+for row in range(1, ws.max_row + 1):
+    cell = ws.cell(row=row, column=13)  # Get column number from letter
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+thin_border = Border(
+    left=Side(style='thin'),
+    right=Side(style='thin'),
+    top=Side(style='thin'),
+    bottom=Side(style='thin')
+)
+
+# Apply borders to all cells with values
+for row in range(1, ws.max_row + 1):
+    for col in range(1, ws.max_column + 1):
+        cell = ws.cell(row=row, column=col)
+        if cell.value is not None and str(cell.value).strip() != '':
+            cell.border = thin_border
+
+
+
+# Cambiar color de fondo y fuente de la fila 1
+
+row_num = 1  # Change to the desired row number
+font_color = 'FFFFFF'  # Red font (hex code; e.g., '000000' for black)
+fill_color = '708090'  # Yellow fill (hex code; e.g., 'FFFFFF' for white)
+for col in range(1, ws.max_column + 1):
+    cell = ws.cell(row=row_num, column=col)
+    cell.font = Font(color=font_color, bold=True)
+    cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
+
+# Save the modified file
+
+wb.save(os.path.join(export_dir, "statistics_format.xlsx"))
+
 statistics_table.to_csv(os.path.join(export_dir, 'table_statistics.csv'), index=False, float_format='%.4f')
+
+
+
+
+### FIN STYLE
 
 
 
