@@ -932,8 +932,7 @@ const menuItems = [
   { name: "Multifinger Home", href: "/multifinger_caliper" },
   { name: "Integrity Table", href: "/multifinger_caliper/integrity-table" },
   { name: "Requirements", href: "/multifinger_caliper/requirements" },
-  { name: "Settings", href: "#" },
-  { name: "Help", href: "#" },
+
 ];
 
 export default function MultifingerCaliperPage() {
