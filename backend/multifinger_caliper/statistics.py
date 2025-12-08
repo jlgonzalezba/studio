@@ -32,7 +32,7 @@ from openpyxl.styles import Font, PatternFill
 
 
 # constantes
-tally_difference = 0.3/100
+tally_difference = 0.6/100
 
 
 collars = collars.to_numpy()
@@ -289,8 +289,8 @@ for row in range(1, ws.max_row + 1):
 # Cambiar color de fondo y fuente de la fila 1
 
 row_num = 1  # Change to the desired row number
-font_color = 'FFFFFF'  # Red font (hex code; e.g., '000000' for black)
-fill_color = '708090'  # Yellow fill (hex code; e.g., 'FFFFFF' for white)
+font_color = 'FFFFFF'  # font 
+fill_color = '708090'  # fill 
 for col in range(1, ws.max_column + 1):
     cell = ws.cell(row=row_num, column=col)
     cell.font = Font(color=font_color, bold=True)
