@@ -11,8 +11,7 @@ const menuItems = [
   { name: "Multifinger Home", href: "/multifinger_caliper" },
   { name: "Integrity Table", href: "/multifinger_caliper/integrity-table" },
   { name: "Requirements", href: "/multifinger_caliper/requirements" },
-  { name: "Settings", href: "#" },
-  { name: "Help", href: "#" },
+
 ];
 
 export default function RequirementsPage() {
@@ -55,7 +54,7 @@ export default function RequirementsPage() {
 
               <ol className="list-decimal list-inside space-y-4 text-gray-700">
                 <li>
-                  For now, we only support logs recorded in feet. (Meters support coming soon.)
+                  For now, we only support logs run in feet. (Meters support coming soon.)
                 </li>
                 <li>
                   The step must be 0.1 ft / measurement.

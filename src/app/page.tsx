@@ -84,9 +84,7 @@ export default function Home() {
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground mb-6 max-w-3xl">
             Try our best Apps to enhance your productivity
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            A centralized space for your Cased Hole Logs tools. Designed to be clean, fast, and professional.
-          </p>
+         
          
         </section>
 
@@ -105,7 +103,7 @@ export default function Home() {
             <Link href="#">
               <AppCard
                 icon={BarChart}
-                title="PLT's Interpretation On The Fly"
+                title="PLT & ILT Interpretation On The Fly"
                 subtitle="Real-time interpretation"
                 description="Analyze production logs (PLT) on the fly for immediate insights."
                 color="purple"

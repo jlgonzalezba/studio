@@ -41,8 +41,8 @@ export function Header() {
   };
 
   const navLinks = [
-    { href: "#", label: "News" },
-    { href: "#", label: "Contact Us" },
+    { href: "/news", label: "News" },
+    { href: "/contact", label: "Contact Us" },
   ];
 
   return (
